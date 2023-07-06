@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adding Playlist</title>
+<style type="text/css">
+body {
+	background-color: #E0F0F0
+}
+.good {
+	font-size: large;
+	color: green;
+}
+</style>
+</head>
+<body>
+<h2>Adding new playlist to photo frame</h2>
+<div id="resp"></div>
+<script>
+	// get the playlist title, the link to retrieve the list of files and the slide delay time
+	const urlParams = new URLSearchParams(window.location.search);
+	const galURL = urlParams.get('nplk');
+//	console.log(atob(galURL));
+	const galTTL = urlParams.get('nplt');
+//	console.log(atob(galTTL));
+	const galSDly = urlParams.get('sdly');
+	const galPCnt = urlParams.get('pcnt');
+
+	let fD = {plk: galURL, ttl: galTTL, pcnt: galPCnt, sdly: galSDly};
+	fetch('http://picframe.local', {headers:{"Content-Type": "application/json"},method:'POST',body:JSON.stringify(fD)})
+	.then(resp => { if (!resp.ok) throw new Error(`HTTP ${resp.status}`); if (false) return resp.json(); else return resp.text() })
+	.then(data => {
+		console.log(data);
+		document.getElementById('resp').innerHTML = data;
+	})
+	.catch(err => alert('Failure: '+err));
+</script>
+</body>
+</html>

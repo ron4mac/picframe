@@ -1,0 +1,459 @@
+"use strict";
+
+// Dependencies
+const http = require('http');
+const https = require('https');
+const {parse} = require('querystring');
+const fs = require('fs');
+const path = require('path');
+const process = require('process');
+const {exec} = require("child_process");
+
+// Config
+const documentRoot = '.';
+const debugMode = false;
+const enableUrlDecoding = true;
+const hostname = process.env.NODE_WEB_HOST || '0.0.0.0';
+const port = process.env.NODE_WEB_PORT || 80;
+const PLISTS = 'playlists';
+const PLISTSFS = PLISTS+'/';
+const PLKEYS = 'plkeys';
+const PLKEYSFS = PLKEYS+'/';
+
+// dynamic variables
+var playLists = null;
+var curPlist = null;
+var gresp = null;	// global response
+//var fehp = null;	// feh process
+var dspOn = true;
+
+process.on('SIGTERM', signal => {
+	console.log(`Process ${process.pid} received a SIGTERM signal`);
+//	if (fehp) fehp.kill('SIGTERM');
+	process.exit(0);
+});
+process.on('SIGINT', signal => {
+	console.log(`Process ${process.pid} received a SIGINT signal`);
+//	if (fehp) fehp.kill('SIGTERM');
+	process.exit(0);
+});
+
+// check room lighting
+const liteck = () => {
+	exec('python3 liteck.py', (error, stdout, stderr) => {
+		if (error) {
+			console.error(`lck-error: ${error.message}`);
+			return;
+		}
+		if (stderr) {
+			console.error(`lck-stderr: ${stderr}`);
+			return;
+		}
+		if (stdout) {
+			if (dspOn && stdout>1000000) {
+				dspOn = false;
+				console.log('DISPLAY OFF');
+				exec('DISPLAY=:0.0 xrandr --output HDMI-1 --off');
+			}
+			if (!dspOn && stdout<30000) {
+				dspOn = true;
+				console.log('DISPLAY ON');
+				exec('DISPLAY=:0.0 xrandr --output HDMI-1 --auto');
+			}
+		}
+	});
+}
+
+// serve a file
+const serveFile = (filePath, response, url) => {
+	let extname = String(path.extname(filePath)).toLowerCase();
+	const MIME_TYPES = {
+		'.html': 'text/html',
+		'.css': 'text/css',
+		'.js': 'text/javascript',
+		'.jpeg': 'image/jpeg',
+		'.jpg': 'image/jpeg',
+		'.png': 'image/png',
+		'.json': 'application/json'
+	};
+
+	let contentType = MIME_TYPES[extname] || 'application/octet-stream';
+
+	// Serve static files
+	fs.readFile(filePath, function(error, content) {
+		if (error) {
+			if(error.code === 'ENOENT') {
+				fs.readFile(documentRoot + '/404.html', function(error, content) {
+					if (error) { console.error(error); }
+					else {
+						response.writeHead(404, { 'Content-Type': 'text/html' });
+						response.end(content, 'utf-8');
+						// log served 404 page
+						console.log('[Info] Served 404 page.');
+					}
+				});
+			}
+			else if (error.code === 'EISDIR' && fs.existsSync(filePath+'/index.html')) {
+				fs.readFile(filePath+'/index.html', function(error, content) {
+					if (error) { console.error(error); }
+					else {
+						response.writeHead(200, { 'Content-Type': 'text/html' });
+						response.end(content, 'utf-8');
+						// log served page
+						console.log('[Info] Served:', url);
+					}
+				});
+			}
+			else {
+				response.writeHead(500);
+				response.end('Sorry, check with the site admin for error: '+error.code+' ...\n');
+				// display error
+				console.log('[Error] Could not serve request:', url);
+				console.error(error);
+			}
+		}
+		else {
+			response.writeHead(200, { 'Content-Type': contentType });
+			response.end(content, 'utf-8');
+			// log served response
+			console.log('[Info] Served:', url);
+		}
+	});
+};
+
+// send back some JSON data
+const jsonRespond = (data) => {
+	gresp.writeHead(200, { 'Content-Type': 'application/json' }); 
+	gresp.end(JSON.stringify(data));
+};
+
+// send back some text/html data
+const textRespond = (data) => {
+	gresp.writeHead(200, { 'Content-Type': 'text/html' }); 
+	gresp.end(data);
+};
+
+// get playlists
+const getPlaylists = (cb) => {
+	fs.readdir(PLISTS, (err, files) => {
+		if (err) console.error('getPlayLists',err,files);
+		playLists = files;
+		cb();
+	});
+};
+
+// perform command
+const performCommand = async (parms) => {
+	//console.log(parms);
+	switch (parms.cmd) {
+		case 'lists':
+			//console.log('Get Playlists');
+			let plists = [];
+			fs.readdir(PLKEYS, (err, files) => {
+				if (err) console.error('getPlayLists',err,files);
+				files.forEach(f => {
+					try {
+						let parms = JSON.parse(fs.readFileSync(PLKEYSFS+f));
+						plists.push({ttl:f, pcnt:parms.pcnt, sdly:parms.sdly});
+					} catch (err) {
+						console.error(err.message);
+					}
+				});
+				jsonRespond({curlst:curPlist,lists:plists});
+			});
+			break;
+		case 'poff':
+			exec('shutdown -h now', (error, stdout, stderr) => {
+				if (error) {
+					console.error(`error: ${error.message}`);
+					return;
+				}
+				if (stderr) {
+					console.error(`stderr: ${stderr}`);
+					return;
+				}
+				if (stdout) console.log(`stdout: ${stdout}`);
+			});
+			textRespond('<h1>Shutting down the picture frame ...</h1>');
+			break;
+		case 'boot':
+			exec('reboot', (error, stdout, stderr) => {
+				if (error) {
+					console.error(`error: ${error.message}`);
+					return;
+				}
+				if (stderr) {
+					console.error(`stderr: ${stderr}`);
+					return;
+				}
+				if (stdout) console.log(`stdout: ${stdout}`);
+			});
+			textRespond('<h1>Restarting the picture frame ...</h1>');
+			break;
+		case 'dspoff':
+			exec('DISPLAY=:0.0 xrandr --output HDMI-1 --brightness 0', (error, stdout, stderr) => {
+				if (error) {
+					console.error(`error: ${error.message}`);
+					return;
+				}
+				if (stderr) {
+					console.error(`stderr: ${stderr}`);
+					return;
+				}
+				if (stdout) console.log(`stdout: ${stdout}`);
+			});
+			textRespond('<h1>Display Off</h1>');
+			break;
+		case 'dspon':
+			exec('DISPLAY=:0.0 xrandr --output HDMI-1 --brightness 1', (error, stdout, stderr) => {
+				if (error) {
+					console.error(`error: ${error.message}`);
+					return;
+				}
+				if (stderr) {
+					console.error(`stderr: ${stderr}`);
+					return;
+				}
+				if (stdout) console.log(`stdout: ${stdout}`);
+			});
+			textRespond('<h1>Display On</h1>');
+			break;
+		default:
+			jsonRespond(parms);
+	}
+};
+
+const fehRun = (plist, dly='5.0') => {
+	//// SHOULD THE PLAYLIST BE UPDATED FIRST?
+//	exec('killall -9 feh');
+//	exec(`DISPLAY=:0.0 feh -D ${dly} --fullscreen --auto-zoom -f playlists/${plist} &`, (error, stdout, stderr) => {
+	console.log(`Running playlist ${plist}`);
+//	exec(`DISPLAY=:0.0 feh -D ${dly} -F -Y -Z -f playlists/${plist}`, (error, stdout, stderr) => {
+	exec(`killall -9 feh; DISPLAY=:0.0 feh -D ${dly} -F -Y -Z -f playlists/${plist}`, {uid:1000}, (error, stdout, stderr) => {
+		if (error) {
+			console.error(`error: ${error.message}`);
+			return;
+		}
+		if (stderr) {
+			console.error(`stderr: ${stderr}`);
+			return;
+		}
+		if (stdout) console.log(`stdout: ${stdout}`);
+	});
+};
+
+const showPlaylist = (plist) => {
+	if (!plist) return;
+	curPlist = plist;
+	fs.readFile(PLKEYSFS+plist, (error, content) => {
+		if (error) {
+			console.error(`plkey-error: ${error.message}`)
+			fehRun(plist);
+			return;
+		}
+		console.log(JSON.parse(content));
+		fehRun(plist, JSON.parse(content).sdly);
+	});
+};
+
+// change the playlist being displayed
+const setPlaylist = async (parms) => {
+	console.log(parms);
+	showPlaylist(parms.list);
+	jsonRespond({});
+};
+
+// delete a playlist
+const delPlaylist = async (parms) => {
+	console.log(parms);
+	if (parms.delp==curPlist) {
+		gresp.writeHead(405);
+		gresp.end('Can not delete the currently running playlist.\n');
+		return;
+	}
+	try {
+		fs.unlinkSync(PLISTSFS+parms.delp);
+		fs.unlinkSync(PLKEYSFS+parms.delp);
+	} catch (err) {
+		console.error(err.message);
+	}
+	getPlaylists(()=>jsonRespond({}));
+};
+
+// refresh a playlist
+const refrPlaylist = async (parms) => {
+	//console.log(parms);
+	let ttl = parms.refr;
+	console.log('Refreshing: ',ttl);
+	fs.readFile(PLKEYSFS+ttl, (error, content) => {
+		if (error) { console.error(error); }
+		else {
+			let lstp = JSON.parse(content);
+			getPlayList(lstp.plk, ttl, false);
+		}
+	});
+	jsonRespond({});
+};
+
+// add a new playlist
+const addPlaylist = async (parms) => {
+	console.log(parms);
+	fs.readFile('static/getnpl.htm', (error, content) => {
+		gresp.writeHead(200, { 'Content-Type': 'text/html' });
+		gresp.end(content, 'utf-8');
+	});
+};
+
+// get playlist contents and write to file
+const getPlayList = (plk, ttl, nupl=true) => {
+	let str = '';
+	let req = https.get(plk, (resp) => {
+		resp.on('data', (chunk) => {
+			str += chunk;
+		}).on('end', () => {
+			let plist = str.split('\t\t\t\t').pop().split('\t');
+			//console.log(plist);
+			fs.writeFile(PLISTSFS+ttl, plist[1], err => {
+				if (err) console.error(err);
+				if (nupl && playLists.indexOf(ttl) == -1) playLists.push(ttl);
+				showPlaylist(ttl);
+			});
+			fs.readFile(PLKEYSFS+ttl, (error, content) => {
+				if (error) {
+					console.error(error);
+				} else {
+					let parms = JSON.parse(content);
+					parms.pcnt = plist[0];
+					fs.writeFile(PLKEYSFS+ttl, JSON.stringify(parms), err => {
+						if (err) { console.error(err); }
+					});
+				}
+			});
+		});
+	}).end();
+};
+
+// add a new playlist
+const newPlaylist = (parms) => {
+	let plk = Buffer.from(parms.plk,'base64').toString('utf8');
+	let ttl = parms.ttl;
+	let dcttl = Buffer.from(parms.ttl,'base64').toString('utf8');
+	let sdly = parms.sdly;
+	let pcnt = parms.pcnt;
+	console.log(plk,dcttl,pcnt,sdly);
+	fs.writeFile(PLKEYSFS+ttl, JSON.stringify({pcnt: pcnt, sdly: sdly, plk: plk}), err => {
+		if (err) { console.error(err); }
+	});
+	getPlayList(plk, ttl, true);
+	// creating files above is async
+	// but just respond anyway, hoping there was success
+	textRespond(`<span class="good">Playlist "${dcttl}" added to picture frame.</span>`);
+};
+
+// wait until X window access is authorized
+function waitX () {
+	exec('DISPLAY=:0.0 xhost', {uid:1000}, (error, stdout, stderr) => {
+		if (error) {
+			console.log(`error: ${error.message}`);
+			setTimeout(waitX, 5000);
+			return;
+		}
+		if (stderr) {console.log(`stderr: ${stderr}`);return;}
+		console.log(`stdout: ${stdout}`);
+		if (stdout.indexOf('SI:localuser')>0) {
+			showPlaylist(curPlist);
+		} else {
+			setTimeout(waitX, 5000);
+		}
+	});
+}
+
+// Web server
+http.createServer(function (request, response) {
+	const {headers, method, url} = request;
+
+	console.log('[Info] Requested:', url);
+	if (debugMode === true && enableUrlDecoding === true) {
+		console.log('[Debug] Decoded:', decodeURI(url));
+	}
+
+	gresp = response;
+
+	if (method=='POST') {
+		let body = '';
+		request.on('error', (err) => {
+			console.error(err);
+		}).on('data', (chunk) => {
+			body += chunk.toString();
+		}).on('end', () => {
+			response.on('error', (err) => {
+				console.error(err);
+			});
+			newPlaylist(JSON.parse(body));
+		});
+		return;
+	}
+
+	if (url.startsWith('/?list')) {
+		setPlaylist(parse(url.substring(2)));
+		return;
+	}
+	if (url.startsWith('/?cmd')) {
+		performCommand(parse(url.substring(2)));
+		return;
+	}
+	if (url.startsWith('/?nplk')) {
+		addPlaylist(parse(url.substring(2)));
+		return;
+	}
+	if (url.startsWith('/?delp')) {
+		delPlaylist(parse(url.substring(2)));
+		return;
+	}
+	if (url.startsWith('/?refr')) {
+		refrPlaylist(parse(url.substring(2)));
+		return;
+	}
+
+	let filePath = url;
+
+	// Correct root path
+	if (filePath === '/') {
+		filePath = documentRoot + '/index.html';
+	}
+	else {
+		filePath = documentRoot + (enableUrlDecoding === true ? decodeURI(url) : url);
+	}
+
+	// serve the file
+	serveFile(filePath, response, url);
+
+}).listen(port, hostname, () => {
+	console.log(`Picframe/Server (http://${hostname}:${port}) started`);
+	// make sure playlist folders exist
+	try {
+		if (!fs.existsSync(PLISTS)) { fs.mkdirSync(PLISTS); }
+		if (!fs.existsSync(PLKEYS)) { fs.mkdirSync(PLKEYS); }
+	} catch (err) {
+		console.error(err);
+	}
+	// get playlists and start a random one
+	getPlaylists(()=>{
+		if (playLists) {
+			curPlist = playLists[playLists.length * Math.random() | 0];
+		}
+		waitX();
+	});
+	// watch room lighting
+	setInterval(liteck, 60000);
+});
+
+//var certs = {
+//	key: fs.readFileSync("server.key"),
+//	cert: fs.readFileSync("server.cert"),
+//};
+//// so we can fake https
+//https.createServer(certs, (req, res) => {
+//	res.writeHead(200,{'Access-Control-Allow-Origin': '*'});
+//	res.end("hello world\n");
+//}).listen(443);

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Our Photo Frame</title>
+<link href="static/style.css" rel="stylesheet">
+<style type="text/css">
+.plst {
+	cursor: pointer;
+}
+.plst:hover {
+	background-color: aquamarine;
+}
+.plst.activ {
+	background-color: aquamarine;
+}
+</style>
+</head>
+<body>
+<div id="plists">
+</div>
+<script>
+	var actvl = null;
+	document.getElementById('plists').addEventListener('click', evt => {
+		console.log(evt);
+		let lem = evt.target;
+		let pln = lem.dataset.pln;
+		if (!pln) { lem = lem.parentElement; pln = lem.dataset.pln; }
+		if (pln) {
+			fetch(galURL+'/?list='+pln, {method:'GET'})
+			.then(resp => { console.log(resp); if (!resp.ok) throw new Error(`HTTP ${resp.status}`); if (true) return resp.json(); else return resp.text() })
+			.then(data => {
+				console.log(data);
+				if (actvl) actvl.classList.remove('activ');
+				lem.classList.add('activ');
+				actvl = lem;
+			})
+			.catch(err => alert('Failure: '+err));
+		}
+	});
+	const galURL = 'http://picframe.local';
+	const getList = () => {
+		fetch(galURL+'/?cmd=lists', {method:'GET'})
+		.then(resp => { console.log(resp); if (!resp.ok) throw new Error(`HTTP ${resp.status}`); if (true) return resp.json(); else return resp.text() })
+		.then(data => {
+			console.log(data);
+			if (!data.lists.length) {
+				document.getElementById('plists').innerHTML = '<h2>NO PLAYLISTS WERE FOUND</h2>';
+				return;
+			}
+			let curr = data.curlst;
+			let lnks = data.lists.map(lst => {
+				let act = lst.ttl==curr ? ' activ' : '';
+				let ttl = atob(lst.ttl);
+				return `<div class="plst${act}" data-pln="${lst.ttl}"><div class="plst-ttl">${ttl}</div><div class="plst-xtr">${lst.pcnt} Photos : ${lst.sdly} Seconds</div></div>`;
+			});
+			document.getElementById('plists').innerHTML = lnks.join('<br>');
+			actvl = document.querySelector('.plst.activ');
+		})
+		.catch(err => alert('Failure: '+err));
+	}
+	getList();
+</script>
+</body>
+</html>
+

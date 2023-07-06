@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PicFrame Manager</title>
+<link href="static/style.css" rel="stylesheet">
+<style type="text/css">
+.rfract {
+	color:lightblue;
+	margin-right: 0.5rem;
+}
+.rfract:hover {
+	color: blue;
+	cursor: pointer;
+}
+.delact {
+	color:coral;
+	margin-left: 0.5rem;
+}
+.delact:hover {
+	color: red;
+	cursor: pointer;
+}
+#podlg {
+	position: absolute;
+	right: 5em;
+	top: 5em;
+	display: none;
+	border: 1px solid #AAA;
+	padding: 1rem;
+	border-radius: 0.2rem;
+	background-color: aliceblue;
+	font-size: larger;
+	box-shadow: #CCC 0.2rem 0.2rem 1rem;
+}
+.act {
+	margin-top: 0.5rem;
+	border-top: 1px solid #CCC;
+	padding: 1rem;
+}
+.act button {
+	font-size: large;
+}
+</style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"
+	integrity="sha512-SfTiTlX6kk+qitfevl/7LibUOeJWlt9rbyDn92a1DqWOw9vWG2MFoays0sgObmWazO5BQPiFucnnEAjpAB+/Sw=="
+	crossorigin="anonymous" referrerpolicy="no-referrer" />
+</head>
+<body>
+<div id="hdr"><span>My Picture Frame</span><i class="fa fa-power-off" aria-hidden="true" onclick="doPO()"></i></div>
+<div id="plists"></div>
+<div id="podlg">
+	<input type="radio" id="poOff" name="poOpt" value="poff" checked> <label for="poOff">Shut Down</label><br>
+	<input type="radio" id="poBoot" name="poOpt" value="boot"> <label for="poBoot">Restart</label>
+	<div class="act"><button onclick="poAct(false)"> Cancel </button>&nbsp;&nbsp;&nbsp;<button onclick="poAct(true)"> Do It </button></div>
+</div>
+<script>
+	var actvl = null;
+	document.getElementById('plists').addEventListener('click', evt => {
+		console.log(evt);
+		let lem = evt.target;
+		let pln = lem.dataset.pln;
+		if (!pln) { lem = lem.parentElement; pln = lem.dataset.pln; }
+		if (!pln) return;
+		let actr = lem.className;
+		switch (actr) {
+			case 'delact':
+				if (confirm('Are you sure that you want to delete this playlist?')) {
+					fetch(galURL+'/?delp='+pln, {method:'GET'})
+					.then(resp => { console.log(resp); if (!resp.ok) throw new Error(`HTTP ${resp.status}`); if (true) return resp.json(); else return resp.text() })
+					.then(data => {
+						console.log(data);
+						location.reload();
+					})
+					.catch(err => alert('Failure: '+err));
+				}
+				break;
+			case 'rfract':
+				if (confirm('An attempt will be made to refresh the playlist on the photo frame, reflecting gallery changes ... continue?')) {
+					fetch(galURL+'/?refr='+pln, {method:'GET'})
+					.then(resp => { console.log(resp); if (!resp.ok) throw new Error(`HTTP ${resp.status}`); if (true) return resp.json(); else return resp.text() })
+					.then(data => {
+						console.log(data);
+						location.reload();
+					})
+					.catch(err => alert('Failure: '+err));
+				}
+		}
+	});
+	const galURL = 'http://picframe.local';
+	const getList = () => {
+		fetch(galURL+'/?cmd=lists', {method:'GET'})
+		.then(resp => { console.log(resp); if (!resp.ok) throw new Error(`HTTP ${resp.status}`); if (true) return resp.json(); else return resp.text() })
+		.then(data => {
+			console.log(data);
+			if (!data.lists.length) {
+				document.getElementById('plists').innerHTML = '<h2>NO PLAYLISTS WERE FOUND</h2>';
+				return;
+			}
+			let curr = data.curlst;
+			let lnks = data.lists.map(lst => {
+				let actc = lst.ttl==curr ? ' activ' : '';
+				let dlbt = lst.ttl==curr ? '' : `<span class="delact" data-pln="${lst.ttl}"> <i class="fa fa-times" aria-hidden="true"></i></span>`;
+				let refr = `<span class="rfract" data-pln="${lst.ttl}"> <i class="fa fa-refresh" aria-hidden="true"></i></span>`;
+				let ttl = atob(lst.ttl);
+				return `<div class="plst${actc}"><div class="plst-ttl">${refr} ${ttl} ${dlbt}</div></div>`;
+			});
+			document.getElementById('plists').innerHTML = lnks.join('<br>');
+			actvl = document.querySelector('.plst.activ');
+		})
+		.catch(err => alert('Failure: '+err));
+	}
+	const doPO = () => {
+		document.getElementById('podlg').style.display = 'inline-block';
+	};
+	const poAct = (doit) => {
+		document.getElementById('podlg').style.display = 'none';
+		if (doit) {
+			let act = document.querySelector('input[name="poOpt"]:checked').value;
+			fetch(galURL+'/?cmd='+act, {method:'GET'})
+			.then(resp => { console.log(resp); if (!resp.ok) throw new Error(`HTTP ${resp.status}`); if (false) return resp.json(); else return resp.text() })
+			.then(data => {
+				console.log(data);
+				document.getElementById('plists').innerHTML = data;
+			})
+			.catch(err => alert('Failure: '+err));
+		}
+	};
+	getList();
+</script>
+</body>
+</html>

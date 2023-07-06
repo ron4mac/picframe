@@ -1,0 +1,28 @@
+body {
+	background-color: #E0F0F0
+}
+#hdr {
+	font-size: xx-large;
+	margin-bottom: 1rem;
+	border-bottom: 1px solid #AAA;
+	padding-bottom: 0.5rem;
+}
+#hdr i {float:right}
+#plists {
+	display: flex;
+	flex-wrap: wrap;
+}
+.plst {
+	display: inline-block;
+	text-align: center;
+	border: 1px solid #33F;
+	padding: 0.5em 1em;
+	border-radius: 0.4em;
+	margin-right: 1rem;
+	margin-bottom: 1rem;
+	background-color: aliceblue;
+}
+.plst.activ {
+	background-color: khaki;
+}
+.plst-ttl {font-size: x-large}
