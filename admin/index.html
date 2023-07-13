@@ -49,7 +49,28 @@
 </head>
 <body>
 <div id="hdr"><span>My Picture Frame</span><i class="fa fa-power-off" aria-hidden="true" onclick="doPO()"></i></div>
-<div id="plists"></div>
+<!-- Tab links -->
+<div class="tab">
+  <button class="tablinks" onclick="openCity(event, 'playlists')" id="defaultOpen">Playlists</button>
+  <button class="tablinks" onclick="openCity(event, 'settings')">Settings</button>
+</div>
+<div id="playlists" class="tabcontent">
+	<div id="plists"></div>
+</div>
+<div id="settings" class="tabcontent">
+	<form action="/action_page.php">
+		<div>
+			<label for="timeon">Select a time:</label>
+			<input type="time" id="timeon" name="timeon" value="07:00">
+		</div>
+		<div>
+			<label for="timeoff">Select a time:</label>
+			<input type="time" id="timeoff" name="timeoff" value="17:25">
+		</div>
+		<input type="submit">
+	</form>
+	<div id="offon"></div>
+</div>
 <div id="podlg">
 	<input type="radio" id="poOff" name="poOpt" value="poff" checked> <label for="poOff">Shut Down</label><br>
 	<input type="radio" id="poBoot" name="poOpt" value="boot"> <label for="poBoot">Restart</label>
@@ -127,7 +148,28 @@
 			.catch(err => alert('Failure: '+err));
 		}
 	};
+	const openCity = (evt, cityName) => {
+		// Declare all variables
+		let i, tabcontent, tablinks;
+
+		// Get all elements with class="tabcontent" and hide them
+		tabcontent = document.getElementsByClassName('tabcontent');
+		for (i = 0; i < tabcontent.length; i++) {
+			tabcontent[i].style.display = 'none';
+		}
+
+		// Get all elements with class="tablinks" and remove the class "active"
+		tablinks = document.getElementsByClassName('tablinks');
+		for (i = 0; i < tablinks.length; i++) {
+			tablinks[i].className = tablinks[i].className.replace(' active', '');
+		}
+
+		// Show the current tab, and add an "active" class to the button that opened the tab
+		document.getElementById(cityName).style.display = 'block';
+		evt.currentTarget.className += ' active';
+	};
 	getList();
+	document.getElementById('defaultOpen').click();
 </script>
 </body>
 </html>

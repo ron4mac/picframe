@@ -6,6 +6,24 @@
 <title>Our Photo Frame</title>
 <link href="static/style.css" rel="stylesheet">
 <style type="text/css">
+#ctrls {
+	display: flex;
+	margin-bottom: 0.5rem;
+	padding: 0.5rem;
+	border-bottom: 2px solid blueviolet;
+}
+.plst-ctrl {
+	padding: .5rem 1rem;
+	border: 1px solid blue;
+	border-radius: 0.4em;
+	margin-right: 1rem;
+	background-color: #b3cfb3;
+	color: blue;
+	cursor: pointer;
+}
+.plst-ctrl:hover {
+	background-color: #d3efd3;
+}
 .plst {
 	cursor: pointer;
 }
@@ -15,13 +33,33 @@
 .plst.activ {
 	background-color: aquamarine;
 }
+.plst-ttl, .plst-xtr {
+	white-space: nowrap;;
+}
 </style>
 </head>
 <body>
+<div id="ctrls">
+	<div class="plst-ctrl" data-act="prev">Previous</div>
+	<div class="plst-ctrl" data-act="next">Next</div>
+</div>
 <div id="plists">
 </div>
 <script>
 	var actvl = null;
+	document.getElementById('ctrls').addEventListener('click', evt => {
+		console.log(evt);
+		let aem = evt.target;
+		let act = aem.dataset.act;
+		if (act) {
+			fetch(galURL+'/?cmd='+act, {method:'GET'})
+			.then(resp => { console.log(resp); if (!resp.ok) throw new Error(`HTTP ${resp.status}`); if (true) return resp.json(); else return resp.text() })
+			.then(data => {
+				console.log(data);
+			})
+			.catch(err => alert('Failure: '+err));
+		}
+	});
 	document.getElementById('plists').addEventListener('click', evt => {
 		console.log(evt);
 		let lem = evt.target;
@@ -55,7 +93,7 @@
 				let ttl = atob(lst.ttl);
 				return `<div class="plst${act}" data-pln="${lst.ttl}"><div class="plst-ttl">${ttl}</div><div class="plst-xtr">${lst.pcnt} Photos : ${lst.sdly} Seconds</div></div>`;
 			});
-			document.getElementById('plists').innerHTML = lnks.join('<br>');
+			document.getElementById('plists').innerHTML = lnks.join('');
 			actvl = document.querySelector('.plst.activ');
 		})
 		.catch(err => alert('Failure: '+err));

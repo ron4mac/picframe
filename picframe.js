@@ -40,7 +40,26 @@ process.on('SIGINT', signal => {
 
 // check room lighting
 const liteck = () => {
-	exec('python3 liteck.py', (error, stdout, stderr) => {
+	let date_time = new Date();
+	let hours = date_time.getHours();
+	let ontime = 7;
+	let offtime = 20;
+	//console.log(hours+' HOURS');
+
+	if (dspOn && (hours > offtime)) {
+		dspOn = false;
+		console.log('DISPLAY OFF');
+	//	exec('DISPLAY=:0.0 xrandr --output HDMI-1 --off');
+		exec('vcgencmd display_power 0 2');
+	}
+	if (!dspOn && (hours < offtime && hours > ontime)) {
+		dspOn = true;
+		console.log('DISPLAY ON');
+	//	exec('DISPLAY=:0.0 xrandr --output HDMI-1 --auto');
+		exec('vcgencmd display_power 1 2');
+	}
+
+/*	exec('python3 liteck.py', (error, stdout, stderr) => {
 		if (error) {
 			console.error(`lck-error: ${error.message}`);
 			return;
@@ -49,20 +68,21 @@ const liteck = () => {
 			console.error(`lck-stderr: ${stderr}`);
 			return;
 		}
-		if (stdout) {
-			if (dspOn && stdout>1000000) {
+		if (true || stdout) {
+			console.log(hours+' HOURS WTF!');
+			if (dspOn && (stdout>1000000 || hours > offtime)) {
 				dspOn = false;
 				console.log('DISPLAY OFF');
 				exec('DISPLAY=:0.0 xrandr --output HDMI-1 --off');
 			}
-			if (!dspOn && stdout<30000) {
+			if (!dspOn && (stdout<30000 || (hours < offtime && hours > ontime))) {
 				dspOn = true;
 				console.log('DISPLAY ON');
 				exec('DISPLAY=:0.0 xrandr --output HDMI-1 --auto');
 			}
 		}
-	});
-}
+	});*/
+};
 
 // serve a file
 const serveFile = (filePath, response, url) => {
@@ -190,6 +210,22 @@ const performCommand = async (parms) => {
 			});
 			textRespond('<h1>Restarting the picture frame ...</h1>');
 			break;
+		case 'prev':
+		case 'next':
+			let sig = parms.cmd == 'prev' ? '-12' : '-10';
+			exec(`killall ${sig} feh`, (error, stdout, stderr) => {
+				if (error) {
+					console.error(`error: ${error.message}`);
+					return;
+				}
+				if (stderr) {
+					console.error(`stderr: ${stderr}`);
+					return;
+				}
+				if (stdout) console.log(`stdout: ${stdout}`);
+			});
+			jsonRespond({});
+			break;
 		case 'dspoff':
 			exec('DISPLAY=:0.0 xrandr --output HDMI-1 --brightness 0', (error, stdout, stderr) => {
 				if (error) {
@@ -229,7 +265,7 @@ const fehRun = (plist, dly='5.0') => {
 //	exec(`DISPLAY=:0.0 feh -D ${dly} --fullscreen --auto-zoom -f playlists/${plist} &`, (error, stdout, stderr) => {
 	console.log(`Running playlist ${plist}`);
 //	exec(`DISPLAY=:0.0 feh -D ${dly} -F -Y -Z -f playlists/${plist}`, (error, stdout, stderr) => {
-	exec(`killall -9 feh; DISPLAY=:0.0 feh -D ${dly} -F -Y -Z -f playlists/${plist}`, {uid:1000}, (error, stdout, stderr) => {
+	exec(`killall -15 feh; DISPLAY=:0.0 feh -D ${dly} -F -Y -Z -f playlists/${plist}`, {uid:1000}, (error, stdout, stderr) => {
 		if (error) {
 			console.error(`error: ${error.message}`);
 			return;
