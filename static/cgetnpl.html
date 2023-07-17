@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adding Playlist</title>
+<style type="text/css">
+body {
+	background-color: #E0F0F0
+}
+.good {
+	font-size: large;
+	color: green;
+}
+</style>
+</head>
+<body>
+<h2>Add new playlist to photo frame</h2>
+<div id="resp"></div>
+<form action="#" name="picframe" id="picframe" method="POST">
+<label for="pl-title">Playlist Title</label> <input type="text" name="title" id="pl-title" size="30" value=""><br>
+<input type="checkbox" name="recur" id="pl-recur" value="1"> <label for="pl-recur" style="width:auto">Get images recursively</label><br>
+<label for="pl-vtim">Image view time (secs)</label> <input type="number" name="vtim" id="pl-vtim" value="120"><br>
+<input type="hidden" name="pfkey" value="" />
+<input type="hidden" name="task" value="addList" />
+<input type="hidden" name="d00e4f3534a50c2c83fc97e1ef35cd98" value="1" />
+</form>
+<button onclick="return send2pf()">Save Playlist</button>
+<script>
+	// get the playlist title, the link to retrieve the list of files and the slide delay time
+	const urlParams = new URLSearchParams(window.location.search);
+	const galURL = urlParams.get('nplk');
+//	console.log(atob(galURL));
+	let galTTL = urlParams.get('nplt');
+	document.getElementById('pl-title').value = galTTL;
+//	console.log(atob(galTTL));
+	//const galSDly = urlParams.get('sdly');
+	const galPCnt = urlParams.get('pcnt');
+
+	function send2pf () {
+		galTTL = btoa(document.getElementById('pl-title').value);
+		let galSDly = document.getElementById('pl-vtim').value;
+		let fD = {plk: galURL, ttl: galTTL, pcnt: galPCnt, sdly: galSDly};
+		fetch('http://picframe.local', {headers:{"Content-Type": "application/json"},method:'POST',body:JSON.stringify(fD)})
+		.then(resp => { if (!resp.ok) throw new Error(`HTTP ${resp.status}`); if (false) return resp.json(); else return resp.text() })
+		.then(data => {
+			window.location = 'http://picframe.local';
+			console.log(data);
+			document.getElementById('resp').innerHTML = data;
+		})
+		.catch(err => alert('Failure: '+err));
+		return false;
+	}
+</script>
+</body>
+</html>

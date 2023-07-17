@@ -86,6 +86,7 @@ const liteck = () => {
 
 // serve a file
 const serveFile = (filePath, response, url) => {
+	console.log('SERVE FILE: '+filePath);
 	let extname = String(path.extname(filePath)).toLowerCase();
 	const MIME_TYPES = {
 		'.html': 'text/html',
@@ -117,7 +118,8 @@ const serveFile = (filePath, response, url) => {
 				fs.readFile(filePath+'/index.html', function(error, content) {
 					if (error) { console.error(error); }
 					else {
-						response.writeHead(200, { 'Content-Type': 'text/html' });
+						response.setHeader('Cache-Control', ['no-cache','max-age=0']);
+						response.writeHead(200, { 'Content-Type':'text/html' });
 						response.end(content, 'utf-8');
 						// log served page
 						console.log('[Info] Served:', url);
@@ -133,7 +135,10 @@ const serveFile = (filePath, response, url) => {
 			}
 		}
 		else {
-			response.writeHead(200, { 'Content-Type': contentType });
+			if (contentType=='text/html') {
+				response.setHeader('Cache-Control', ['no-cache','max-age=0']);
+			}
+			response.writeHead(200, { 'Content-Type':contentType });
 			response.end(content, 'utf-8');
 			// log served response
 			console.log('[Info] Served:', url);
@@ -281,13 +286,15 @@ const fehRun = (plist, dly='5.0') => {
 const showPlaylist = (plist) => {
 	if (!plist) return;
 	curPlist = plist;
+	console.log('SPLREAD: '+PLKEYSFS+plist);
 	fs.readFile(PLKEYSFS+plist, (error, content) => {
 		if (error) {
 			console.error(`plkey-error: ${error.message}`)
 			fehRun(plist);
 			return;
 		}
-		console.log(JSON.parse(content));
+		console.log('SPLKEY: '+content);
+	//	console.log(JSON.parse(content));
 		fehRun(plist, JSON.parse(content).sdly);
 	});
 };
@@ -379,8 +386,9 @@ const newPlaylist = (parms) => {
 	console.log(plk,dcttl,pcnt,sdly);
 	fs.writeFile(PLKEYSFS+ttl, JSON.stringify({pcnt: pcnt, sdly: sdly, plk: plk}), err => {
 		if (err) { console.error(err); }
-	});
 	getPlayList(plk, ttl, true);
+	});
+//	getPlayList(plk, ttl, true);
 	// creating files above is async
 	// but just respond anyway, hoping there was success
 	textRespond(`<span class="good">Playlist "${dcttl}" added to picture frame.</span>`);
@@ -451,7 +459,7 @@ http.createServer(function (request, response) {
 		return;
 	}
 
-	let filePath = url;
+	let filePath = parse(url.substring(1));	///.split('?').shift();		//url.split('?').shift();	//url;
 
 	// Correct root path
 	if (filePath === '/') {
@@ -462,7 +470,7 @@ http.createServer(function (request, response) {
 	}
 
 	// serve the file
-	serveFile(filePath, response, url);
+	serveFile(filePath.split('?').shift(), response, url);
 
 }).listen(port, hostname, () => {
 	console.log(`Picframe/Server (http://${hostname}:${port}) started`);
