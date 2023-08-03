@@ -26,6 +26,8 @@ var curPlist = null;
 var gresp = null;	// global response
 //var fehp = null;	// feh process
 var dspOn = true;
+var ontime = 700;
+var offtime = 2000;
 
 process.on('SIGTERM', signal => {
 	console.log(`Process ${process.pid} received a SIGTERM signal`);
@@ -41,47 +43,21 @@ process.on('SIGINT', signal => {
 // check room lighting
 const liteck = () => {
 	let date_time = new Date();
-	let hours = date_time.getHours();
-	let ontime = 7;
-	let offtime = 20;
-	//console.log(hours+' HOURS');
+	let ctim = +(''+date_time.getHours()+date_time.getMinutes());
+//	let ontime = 700;
+//	let offtime = 2000;
+	//console.log(ctim+' HOURS');
 
-	if (dspOn && (hours > offtime)) {
+	if (dspOn && (ctim > offtime)) {
 		dspOn = false;
 		console.log('DISPLAY OFF');
-	//	exec('DISPLAY=:0.0 xrandr --output HDMI-1 --off');
 		exec('vcgencmd display_power 0 2');
 	}
-	if (!dspOn && (hours < offtime && hours > ontime)) {
+	if (!dspOn && (ctim < offtime && ctim > ontime)) {
 		dspOn = true;
 		console.log('DISPLAY ON');
-	//	exec('DISPLAY=:0.0 xrandr --output HDMI-1 --auto');
 		exec('vcgencmd display_power 1 2');
 	}
-
-/*	exec('python3 liteck.py', (error, stdout, stderr) => {
-		if (error) {
-			console.error(`lck-error: ${error.message}`);
-			return;
-		}
-		if (stderr) {
-			console.error(`lck-stderr: ${stderr}`);
-			return;
-		}
-		if (true || stdout) {
-			console.log(hours+' HOURS WTF!');
-			if (dspOn && (stdout>1000000 || hours > offtime)) {
-				dspOn = false;
-				console.log('DISPLAY OFF');
-				exec('DISPLAY=:0.0 xrandr --output HDMI-1 --off');
-			}
-			if (!dspOn && (stdout<30000 || (hours < offtime && hours > ontime))) {
-				dspOn = true;
-				console.log('DISPLAY ON');
-				exec('DISPLAY=:0.0 xrandr --output HDMI-1 --auto');
-			}
-		}
-	});*/
 };
 
 // serve a file
@@ -231,8 +207,8 @@ const performCommand = async (parms) => {
 			});
 			jsonRespond({});
 			break;
-		case 'dspoff':
-			exec('DISPLAY=:0.0 xrandr --output HDMI-1 --brightness 0', (error, stdout, stderr) => {
+		case 'dsp':
+			exec('vcgencmd display_power '+parms.oo+' 2', (error, stdout, stderr) => {
 				if (error) {
 					console.error(`error: ${error.message}`);
 					return;
@@ -243,21 +219,8 @@ const performCommand = async (parms) => {
 				}
 				if (stdout) console.log(`stdout: ${stdout}`);
 			});
-			textRespond('<h1>Display Off</h1>');
-			break;
-		case 'dspon':
-			exec('DISPLAY=:0.0 xrandr --output HDMI-1 --brightness 1', (error, stdout, stderr) => {
-				if (error) {
-					console.error(`error: ${error.message}`);
-					return;
-				}
-				if (stderr) {
-					console.error(`stderr: ${stderr}`);
-					return;
-				}
-				if (stdout) console.log(`stdout: ${stdout}`);
-			});
-			textRespond('<h1>Display On</h1>');
+			let oo = +parms.oo ? 'On' : 'Off';
+			textRespond('<h1>Display '+oo+'</h1>');
 			break;
 		default:
 			jsonRespond(parms);
@@ -412,9 +375,21 @@ function waitX () {
 	});
 }
 
+function setSettings (parms) {
+	console.log(parms);
+	if (parms.timeon) {
+		ontime = +(parms.timeon.replace(':',''));
+	}
+	if (parms.timeoff) {
+		offtime = +(parms.timeoff.replace(':',''));
+	}
+	textRespond('Settings Saved');
+}
+
+
 // Web server
 http.createServer(function (request, response) {
-	const {headers, method, url} = request;
+	const {method, url} = request;
 
 	console.log('[Info] Requested:', url);
 	if (debugMode === true && enableUrlDecoding === true) {
@@ -458,6 +433,10 @@ http.createServer(function (request, response) {
 		refrPlaylist(parse(url.substring(2)));
 		return;
 	}
+	if (url.startsWith('/settings?')) {
+		setSettings(parse(url.substring(10)));
+		return;
+	}
 
 	let filePath = parse(url.substring(1));	///.split('?').shift();		//url.split('?').shift();	//url;
 
@@ -492,12 +471,3 @@ http.createServer(function (request, response) {
 	setInterval(liteck, 60000);
 });
 
-//var certs = {
-//	key: fs.readFileSync("server.key"),
-//	cert: fs.readFileSync("server.cert"),
-//};
-//// so we can fake https
-//https.createServer(certs, (req, res) => {
-//	res.writeHead(200,{'Access-Control-Allow-Origin': '*'});
-//	res.end("hello world\n");
-//}).listen(443);

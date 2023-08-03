@@ -42,23 +42,37 @@
 .act button {
 	font-size: large;
 }
+#hdr a {
+	font-size: large;
+	margin-left: 1rem;
+}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"
 	integrity="sha512-SfTiTlX6kk+qitfevl/7LibUOeJWlt9rbyDn92a1DqWOw9vWG2MFoays0sgObmWazO5BQPiFucnnEAjpAB+/Sw=="
 	crossorigin="anonymous" referrerpolicy="no-referrer" />
+<script>
+	if (!localStorage.getItem('adminok')) {
+		if (prompt('Please validate','')=='1376') {
+			localStorage.setItem('adminok', true);
+		} else {
+			history.back();
+		}
+	}
+</script>
 </head>
 <body>
-<div id="hdr"><span>My Picture Frame</span><i class="fa fa-power-off" aria-hidden="true" onclick="doPO()"></i></div>
+<div id="hdr"><span>Picture Frame Admin</span><a href="/">(return to dashboard)</a><i class="fa fa-power-off" aria-hidden="true" onclick="doPO()"></i></div>
 <!-- Tab links -->
 <div class="tab">
-  <button class="tablinks" onclick="openCity(event, 'playlists')" id="defaultOpen">Playlists</button>
-  <button class="tablinks" onclick="openCity(event, 'settings')">Settings</button>
+	<button class="tablinks" onclick="openCity(event, 'playlists')" id="defaultOpen">Playlists</button>
+	<button class="tablinks" onclick="openCity(event, 'actions')">Actions</button>
+	<button class="tablinks" onclick="openCity(event, 'settings')">Settings</button>
 </div>
 <div id="playlists" class="tabcontent">
 	<div id="plists"></div>
 </div>
 <div id="settings" class="tabcontent">
-	<form action="/action_page.php">
+	<form action="/settings" name="setsform" id="setsform">
 		<div>
 			<label for="timeon">Select a time:</label>
 			<input type="time" id="timeon" name="timeon" value="07:00">
@@ -67,9 +81,12 @@
 			<label for="timeoff">Select a time:</label>
 			<input type="time" id="timeoff" name="timeoff" value="17:25">
 		</div>
-		<input type="submit">
 	</form>
-	<div id="offon"></div>
+	<button onclick="saveSets()">Save Settings</button>
+</div>
+<div id="actions" class="tabcontent">
+	<button onclick="dspSet(0)">Display Off</button>
+	<button onclick="dspSet(1)">Display On</button>
 </div>
 <div id="podlg">
 	<input type="radio" id="poOff" name="poOpt" value="poff" checked> <label for="poOff">Shut Down</label><br>
@@ -148,6 +165,25 @@
 			.catch(err => alert('Failure: '+err));
 		}
 	};
+	const saveSets = () => {
+		let fData = new FormData(setsform);
+		let urls = new URLSearchParams(fData).toString();
+		fetch('/settings?'+urls, {method:'GET'})
+		.then(resp => { console.log(resp); if (!resp.ok) throw new Error(`HTTP ${resp.status}`); if (false) return resp.json(); else return resp.text() })
+		.then(data => {
+			alert(data);
+		})
+		.catch(err => alert('Failure: '+err));
+	}
+	const dspSet = (oo) => {
+		fetch(galURL+'/?cmd=dsp&oo='+oo, {method:'GET'})
+		.then(resp => { console.log(resp); if (!resp.ok) throw new Error(`HTTP ${resp.status}`); if (false) return resp.json(); else return resp.text() })
+		.then(data => {
+			console.log(data);
+			setTimeout(() => alert(data), 10);
+		})
+		.catch(err => alert('Failure: '+err));
+	}
 	const openCity = (evt, cityName) => {
 		// Declare all variables
 		let i, tabcontent, tablinks;
