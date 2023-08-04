@@ -165,6 +165,22 @@
 			.catch(err => alert('Failure: '+err));
 		}
 	};
+	const totimv = (tval) => {
+		tval = tval.padStart(4,'0');
+		let ret = tval.substr(0, tval.length-2) + ':' + tval.substr(-2);
+		console.log(ret);
+		return ret;
+	};
+	const getSets = () => {
+		fetch('/?cmd=getset', {method:'GET'})
+		.then(resp => { console.log(resp); if (!resp.ok) throw new Error(`HTTP ${resp.status}`); if (true) return resp.json(); else return resp.text() })
+		.then(data => {
+			console.log(data);
+			document.getElementById('timeon').value = totimv(''+data.ontime);
+			document.getElementById('timeoff').value = totimv(''+data.offtime);
+		})
+		.catch(err => alert('Failure: '+err));
+	};
 	const saveSets = () => {
 		let fData = new FormData(setsform);
 		let urls = new URLSearchParams(fData).toString();
@@ -174,7 +190,7 @@
 			alert(data);
 		})
 		.catch(err => alert('Failure: '+err));
-	}
+	};
 	const dspSet = (oo) => {
 		fetch(galURL+'/?cmd=dsp&oo='+oo, {method:'GET'})
 		.then(resp => { console.log(resp); if (!resp.ok) throw new Error(`HTTP ${resp.status}`); if (false) return resp.json(); else return resp.text() })
@@ -183,7 +199,7 @@
 			setTimeout(() => alert(data), 10);
 		})
 		.catch(err => alert('Failure: '+err));
-	}
+	};
 	const openCity = (evt, cityName) => {
 		// Declare all variables
 		let i, tabcontent, tablinks;
@@ -204,6 +220,7 @@
 		document.getElementById(cityName).style.display = 'block';
 		evt.currentTarget.className += ' active';
 	};
+	getSets();
 	getList();
 	document.getElementById('defaultOpen').click();
 </script>

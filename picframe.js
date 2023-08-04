@@ -19,6 +19,7 @@ const PLISTS = 'playlists';
 const PLISTSFS = PLISTS+'/';
 const PLKEYS = 'plkeys';
 const PLKEYSFS = PLKEYS+'/';
+const SETSF = 'settings.json';
 
 // dynamic variables
 var playLists = null;
@@ -26,8 +27,9 @@ var curPlist = null;
 var gresp = null;	// global response
 //var fehp = null;	// feh process
 var dspOn = true;
-var ontime = 700;
-var offtime = 2000;
+//var ontime = 700;
+//var offtime = 2000;
+var SS = {ontime: 700, offtime: 2000};
 
 process.on('SIGTERM', signal => {
 	console.log(`Process ${process.pid} received a SIGTERM signal`);
@@ -44,16 +46,14 @@ process.on('SIGINT', signal => {
 const liteck = () => {
 	let date_time = new Date();
 	let ctim = +(''+date_time.getHours()+date_time.getMinutes());
-//	let ontime = 700;
-//	let offtime = 2000;
 	//console.log(ctim+' HOURS');
 
-	if (dspOn && (ctim > offtime)) {
+	if (dspOn && (ctim > SS.offtime)) {
 		dspOn = false;
 		console.log('DISPLAY OFF');
 		exec('vcgencmd display_power 0 2');
 	}
-	if (!dspOn && (ctim < offtime && ctim > ontime)) {
+	if (!dspOn && (ctim < SS.offtime && ctim > SS.ontime)) {
 		dspOn = true;
 		console.log('DISPLAY ON');
 		exec('vcgencmd display_power 1 2');
@@ -222,6 +222,9 @@ const performCommand = async (parms) => {
 			let oo = +parms.oo ? 'On' : 'Off';
 			textRespond('<h1>Display '+oo+'</h1>');
 			break;
+		case 'getset':
+			getSettings();
+			break;
 		default:
 			jsonRespond(parms);
 	}
@@ -378,12 +381,19 @@ function waitX () {
 function setSettings (parms) {
 	console.log(parms);
 	if (parms.timeon) {
-		ontime = +(parms.timeon.replace(':',''));
+		SS.ontime = +(parms.timeon.replace(':',''));
 	}
 	if (parms.timeoff) {
-		offtime = +(parms.timeoff.replace(':',''));
+		SS.offtime = +(parms.timeoff.replace(':',''));
 	}
+	fs.writeFile(SETSF, JSON.stringify(SS), err => {
+		if (err) { console.error(err); }
+	});
 	textRespond('Settings Saved');
+}
+
+function getSettings () {
+	jsonRespond(SS);
 }
 
 
