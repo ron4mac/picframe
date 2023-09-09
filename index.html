@@ -48,24 +48,34 @@
 	cursor: pointer;
 	display: none;
 }
+#thumbs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
 </style>
 </head>
 <body>
 <div id="ctrls">
 	<div class="plst-ctrl" data-act="prev">Previous</div>
 	<div class="plst-ctrl" data-act="next">Next</div>
+	<div class="plst-ctrl" data-act="thms">Thumbnails</div>
 	<div class="plst-admin" data-act="admin">Admin</div>
 </div>
 <div id="plists">
 </div>
+<div id="thumbs">
+<div>
 <script>
 	var actvl = null;
+	var thmsURL = '';
 	document.getElementById('ctrls').addEventListener('click', evt => {
 		console.log(evt);
 		let aem = evt.target;
 		let act = aem.dataset.act;
 		if (act) {
 			if (act=='admin') window.location = '/admin';
+			if (act=='thms') return displayThumbs();
 			fetch(galURL+'/?cmd='+act, {method:'GET'})
 			.then(resp => { console.log(resp); if (!resp.ok) throw new Error(`HTTP ${resp.status}`); if (true) return resp.json(); else return resp.text() })
 			.then(data => {
@@ -87,6 +97,8 @@
 				if (actvl) actvl.classList.remove('activ');
 				lem.classList.add('activ');
 				actvl = lem;
+				thmsURL = lem.dataset.plk;
+				document.getElementById('thumbs').innerHTML = '';
 			})
 			.catch(err => alert('Failure: '+err));
 		}
@@ -107,12 +119,23 @@
 			}
 			let curr = data.curlst;
 			let lnks = data.lists.map(lst => {
+				if (lst.ttl==curr) thmsURL = lst.plk;
 				let act = lst.ttl==curr ? ' activ' : '';
 				let ttl = atob(lst.ttl);
-				return `<div class="plst${act}" data-pln="${lst.ttl}"><div class="plst-ttl">${ttl}</div><div class="plst-xtr">${lst.pcnt} Photos : ${lst.sdly} Seconds</div></div>`;
+				return `<div class="plst${act}" data-pln="${lst.ttl}" data-plk="${lst.plk}"><div class="plst-ttl">${ttl}</div><div class="plst-xtr">${lst.pcnt} Photos : ${lst.sdly} Seconds</div></div>`;
 			});
 			document.getElementById('plists').innerHTML = lnks.join('');
 			actvl = document.querySelector('.plst.activ');
+		})
+		.catch(err => alert('Failure: '+err));
+	}
+	const displayThumbs = () => {
+		if (!thmsURL) return
+		fetch(thmsURL+'&act=thms', {method:'GET'})
+		.then(resp => { console.log(resp); if (!resp.ok) throw new Error(`HTTP ${resp.status}`); if (false) return resp.json(); else return resp.text() })
+		.then(data => {
+			console.log(data);
+			document.getElementById('thumbs').innerHTML = data;
 		})
 		.catch(err => alert('Failure: '+err));
 	}

@@ -150,12 +150,13 @@ const performCommand = async (parms) => {
 		case 'lists':
 			//console.log('Get Playlists');
 			let plists = [];
+			let cplk = '';
 			fs.readdir(PLKEYS, (err, files) => {
 				if (err) console.error('getPlayLists',err,files);
 				files.forEach(f => {
 					try {
 						let parms = JSON.parse(fs.readFileSync(PLKEYSFS+f));
-						plists.push({ttl:f, pcnt:parms.pcnt, sdly:parms.sdly});
+						plists.push({ttl:f, pcnt:parms.pcnt, sdly:parms.sdly, plk:parms.plk});
 					} catch (err) {
 						console.error(err.message);
 					}
