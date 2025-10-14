@@ -41,12 +41,13 @@ body {
 		galTTL = btoa(document.getElementById('pl-title').value);
 		let galSDly = document.getElementById('pl-vtim').value;
 		let fD = {plk: galURL, ttl: galTTL, pcnt: galPCnt, sdly: galSDly};
-		fetch('http://picframe.local', {headers:{"Content-Type": "application/json"},method:'POST',body:JSON.stringify(fD)})
+		fetch('%%LOCAL_PICFRAME%%', {headers:{"Content-Type": "application/json"},method:'POST',body:JSON.stringify(fD)})
 		.then(resp => { if (!resp.ok) throw new Error(`HTTP ${resp.status}`); if (false) return resp.json(); else return resp.text() })
 		.then(data => {
-			window.location = 'http://picframe.local';
-			console.log(data);
-			document.getElementById('resp').innerHTML = data;
+			alert(data);
+			window.location = '%%LOCAL_PICFRAME%%';
+		//	console.log(data);
+		//	document.getElementById('resp').innerHTML = data;
 		})
 		.catch(err => alert('Failure: '+err));
 		return false;

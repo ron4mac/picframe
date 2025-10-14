@@ -1,13 +1,11 @@
 "use strict";
-
 // Dependencies
-const http = require('http');
-const https = require('https');
-const {parse} = require('querystring');
-const fs = require('fs');
-const path = require('path');
-const process = require('process');
-const {exec} = require("child_process");
+import http from 'http';
+import https from 'https';
+import {parse} from 'querystring';
+import {readFile,readFileSync,writeFile,readdir,existsSync,unlinkSync,mkdirSync} from 'fs';
+import path from 'path';
+import {exec} from 'child_process';
 
 // Config
 const documentRoot = '.';
@@ -15,6 +13,7 @@ const debugMode = false;
 const enableUrlDecoding = true;
 const hostname = process.env.NODE_WEB_HOST || '0.0.0.0';
 const port = process.env.NODE_WEB_PORT || 80;
+const localUrl = process.env.LOCAL_PICFRAME || 'http://picframe.local';
 const PLISTS = 'playlists';
 const PLISTSFS = PLISTS+'/';
 const PLKEYS = 'plkeys';
@@ -42,24 +41,6 @@ process.on('SIGINT', signal => {
 	process.exit(0);
 });
 
-// check room lighting
-const liteck = () => {
-	let date_time = new Date();
-	let ctim = +(''+date_time.getHours()+date_time.getMinutes());
-	//console.log(ctim+' HOURS');
-
-	if (dspOn && (ctim > SS.offtime)) {
-		dspOn = false;
-		console.log('DISPLAY OFF');
-		exec('vcgencmd display_power 0 2');
-	}
-	if (!dspOn && (ctim < SS.offtime && ctim > SS.ontime)) {
-		dspOn = true;
-		console.log('DISPLAY ON');
-		exec('vcgencmd display_power 1 2');
-	}
-};
-
 // serve a file
 const serveFile = (filePath, response, url) => {
 	console.log('SERVE FILE: '+filePath);
@@ -77,10 +58,10 @@ const serveFile = (filePath, response, url) => {
 	let contentType = MIME_TYPES[extname] || 'application/octet-stream';
 
 	// Serve static files
-	fs.readFile(filePath, function(error, content) {
+	readFile(filePath, 'utf8', function(error, content) {
 		if (error) {
 			if(error.code === 'ENOENT') {
-				fs.readFile(documentRoot + '/404.html', function(error, content) {
+				readFile(documentRoot + '/404.html', function(error, content) {
 					if (error) { console.error(error); }
 					else {
 						response.writeHead(404, { 'Content-Type': 'text/html' });
@@ -90,10 +71,12 @@ const serveFile = (filePath, response, url) => {
 					}
 				});
 			}
-			else if (error.code === 'EISDIR' && fs.existsSync(filePath+'/index.html')) {
-				fs.readFile(filePath+'/index.html', function(error, content) {
+			else if (error.code === 'EISDIR' && existsSync(filePath+'/index.html')) {
+				readFile(filePath+'/index.html', 'utf8', function(error, content) {
 					if (error) { console.error(error); }
 					else {
+						// substitue for local pic frame
+						content = content.replaceAll('%%LOCAL_PICFRAME%%', localUrl);
 						response.setHeader('Cache-Control', ['no-cache','max-age=0']);
 						response.writeHead(200, { 'Content-Type':'text/html' });
 						response.end(content, 'utf-8');
@@ -113,6 +96,8 @@ const serveFile = (filePath, response, url) => {
 		else {
 			if (contentType=='text/html') {
 				response.setHeader('Cache-Control', ['no-cache','max-age=0']);
+				// substitue for local pic frame
+				content = content.replaceAll('%%LOCAL_PICFRAME%%', localUrl);
 			}
 			response.writeHead(200, { 'Content-Type':contentType });
 			response.end(content, 'utf-8');
@@ -136,7 +121,7 @@ const textRespond = (data) => {
 
 // get playlists
 const getPlaylists = (cb) => {
-	fs.readdir(PLISTS, (err, files) => {
+	readdir(PLISTS, (err, files) => {
 		if (err) console.error('getPlayLists',err,files);
 		playLists = files;
 		cb();
@@ -151,11 +136,11 @@ const performCommand = async (parms) => {
 			//console.log('Get Playlists');
 			let plists = [];
 			let cplk = '';
-			fs.readdir(PLKEYS, (err, files) => {
+			readdir(PLKEYS, (err, files) => {
 				if (err) console.error('getPlayLists',err,files);
 				files.forEach(f => {
 					try {
-						let parms = JSON.parse(fs.readFileSync(PLKEYSFS+f));
+						let parms = JSON.parse(readFileSync(PLKEYSFS+f));
 						plists.push({ttl:f, pcnt:parms.pcnt, sdly:parms.sdly, plk:parms.plk});
 					} catch (err) {
 						console.error(err.message);
@@ -254,7 +239,7 @@ const showPlaylist = (plist) => {
 	if (!plist) return;
 	curPlist = plist;
 	console.log('SPLREAD: '+PLKEYSFS+plist);
-	fs.readFile(PLKEYSFS+plist, (error, content) => {
+	readFile(PLKEYSFS+plist, (error, content) => {
 		if (error) {
 			console.error(`plkey-error: ${error.message}`)
 			fehRun(plist);
@@ -282,8 +267,8 @@ const delPlaylist = async (parms) => {
 		return;
 	}
 	try {
-		fs.unlinkSync(PLISTSFS+parms.delp);
-		fs.unlinkSync(PLKEYSFS+parms.delp);
+		unlinkSync(PLISTSFS+parms.delp);
+		unlinkSync(PLKEYSFS+parms.delp);
 	} catch (err) {
 		console.error(err.message);
 	}
@@ -295,7 +280,7 @@ const refrPlaylist = async (parms) => {
 	//console.log(parms);
 	let ttl = parms.refr;
 	console.log('Refreshing: ',ttl);
-	fs.readFile(PLKEYSFS+ttl, (error, content) => {
+	readFile(PLKEYSFS+ttl, (error, content) => {
 		if (error) { console.error(error); }
 		else {
 			let lstp = JSON.parse(content);
@@ -308,7 +293,7 @@ const refrPlaylist = async (parms) => {
 // add a new playlist
 const addPlaylist = async (parms) => {
 	console.log(parms);
-	fs.readFile('static/getnpl.htm', (error, content) => {
+	readFile('static/getnpl.htm', (error, content) => {
 		gresp.writeHead(200, { 'Content-Type': 'text/html' });
 		gresp.end(content, 'utf-8');
 	});
@@ -317,25 +302,27 @@ const addPlaylist = async (parms) => {
 // get playlist contents and write to file
 const getPlayList = (plk, ttl, nupl=true) => {
 	let str = '';
+console.log('plk: ',plk);
 	let req = https.get(plk, (resp) => {
 		resp.on('data', (chunk) => {
 			str += chunk;
 		}).on('end', () => {
 			let plist = str.split('\t\t\t\t').pop().split('\t');
 			//console.log(plist);
-			fs.writeFile(PLISTSFS+ttl, plist[1], err => {
+			writeFile(PLISTSFS+ttl, plist[1], err => {
 				if (err) console.error(err);
 				if (nupl && playLists.indexOf(ttl) == -1) playLists.push(ttl);
-				showPlaylist(ttl);
+//not here				showPlaylist(ttl);
 			});
-			fs.readFile(PLKEYSFS+ttl, (error, content) => {
+			readFile(PLKEYSFS+ttl, (error, content) => {
 				if (error) {
 					console.error(error);
 				} else {
 					let parms = JSON.parse(content);
 					parms.pcnt = plist[0];
-					fs.writeFile(PLKEYSFS+ttl, JSON.stringify(parms), err => {
+					writeFile(PLKEYSFS+ttl, JSON.stringify(parms), err => {
 						if (err) { console.error(err); }
+						showPlaylist(ttl);	// okay do it here
 					});
 				}
 			});
@@ -351,22 +338,28 @@ const newPlaylist = (parms) => {
 	let sdly = parms.sdly;
 	let pcnt = parms.pcnt;
 	console.log(plk,dcttl,pcnt,sdly);
-	fs.writeFile(PLKEYSFS+ttl, JSON.stringify({pcnt: pcnt, sdly: sdly, plk: plk}), err => {
+	writeFile(PLKEYSFS+ttl, JSON.stringify({pcnt: pcnt, sdly: sdly, plk: plk}), err => {
 		if (err) { console.error(err); }
 	getPlayList(plk, ttl, true);
 	});
 //	getPlayList(plk, ttl, true);
 	// creating files above is async
 	// but just respond anyway, hoping there was success
-	textRespond(`<span class="good">Playlist "${dcttl}" added to picture frame.</span>`);
+//	textRespond(`<span class="good">Playlist "${dcttl}" added to picture frame.</span>`);
+	textRespond(`Playlist "${dcttl}" added to picture frame.`);
 };
 
 // wait until X window access is authorized
 function waitX () {
+	//showPlaylist(curPlist);
+	//return;
+	if (typeof waitX.cnt === 'undefined') {
+		waitX.cnt = 5;
+	}
 	exec('DISPLAY=:0.0 xhost', {uid:1000}, (error, stdout, stderr) => {
 		if (error) {
 			console.log(`error: ${error.message}`);
-			setTimeout(waitX, 5000);
+			if (--waitX.cnt) setTimeout(waitX, 5000);
 			return;
 		}
 		if (stderr) {console.log(`stderr: ${stderr}`);return;}
@@ -374,6 +367,7 @@ function waitX () {
 		if (stdout.indexOf('SI:localuser')>0) {
 			showPlaylist(curPlist);
 		} else {
+			waitX.cnt--;
 			setTimeout(waitX, 5000);
 		}
 	});
@@ -387,7 +381,7 @@ function setSettings (parms) {
 	if (parms.timeoff) {
 		SS.offtime = +(parms.timeoff.replace(':',''));
 	}
-	fs.writeFile(SETSF, JSON.stringify(SS), err => {
+	writeFile(SETSF, JSON.stringify(SS), err => {
 		if (err) { console.error(err); }
 	});
 	textRespond('Settings Saved');
@@ -466,8 +460,8 @@ http.createServer(function (request, response) {
 	console.log(`Picframe/Server (http://${hostname}:${port}) started`);
 	// make sure playlist folders exist
 	try {
-		if (!fs.existsSync(PLISTS)) { fs.mkdirSync(PLISTS); }
-		if (!fs.existsSync(PLKEYS)) { fs.mkdirSync(PLKEYS); }
+		if (!existsSync(PLISTS)) { mkdirSync(PLISTS); }
+		if (!existsSync(PLKEYS)) { mkdirSync(PLKEYS); }
 	} catch (err) {
 		console.error(err);
 	}
@@ -478,7 +472,5 @@ http.createServer(function (request, response) {
 		}
 		waitX();
 	});
-	// watch room lighting
-	setInterval(liteck, 60000);
 });
 

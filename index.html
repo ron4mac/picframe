@@ -107,7 +107,7 @@
 		let admb = document.querySelector('.plst-admin');
 		admb.style.display = 'block';
 	}
-	const galURL = 'http://picframe.local';
+	const galURL = '%%LOCAL_PICFRAME%%';
 	const getList = () => {
 		fetch(galURL+'/?cmd=lists', {method:'GET'})
 		.then(resp => { console.log(resp); if (!resp.ok) throw new Error(`HTTP ${resp.status}`); if (true) return resp.json(); else return resp.text() })
