@@ -23,7 +23,6 @@ const SETSF = 'settings.json';
 // dynamic variables
 var playLists = null;
 var curPlist = null;
-var gresp = null;	// global response
 //var fehp = null;	// feh process
 var dspOn = true;
 //var ontime = 700;
@@ -108,15 +107,15 @@ const serveFile = (filePath, response, url) => {
 };
 
 // send back some JSON data
-const jsonRespond = (data) => {
-	gresp.writeHead(200, { 'Content-Type': 'application/json' }); 
-	gresp.end(JSON.stringify(data));
+const jsonRespond = (data, resp) => {
+	resp.writeHead(200, { 'Content-Type': 'application/json' }); 
+	resp.end(JSON.stringify(data));
 };
 
 // send back some text/html data
-const textRespond = (data) => {
-	gresp.writeHead(200, { 'Content-Type': 'text/html' }); 
-	gresp.end(data);
+const textRespond = (data, resp) => {
+	resp.writeHead(200, { 'Content-Type': 'text/html' }); 
+	resp.end(data);
 };
 
 // get playlists
@@ -129,7 +128,7 @@ const getPlaylists = (cb) => {
 };
 
 // perform command
-const performCommand = async (parms) => {
+const performCommand = async (parms, resp) => {
 	//console.log(parms);
 	switch (parms.cmd) {
 		case 'lists':
@@ -146,7 +145,7 @@ const performCommand = async (parms) => {
 						console.error(err.message);
 					}
 				});
-				jsonRespond({curlst:curPlist,lists:plists});
+				jsonRespond({curlst:curPlist,lists:plists}, resp);
 			});
 			break;
 		case 'poff':
@@ -161,7 +160,7 @@ const performCommand = async (parms) => {
 				}
 				if (stdout) console.log(`stdout: ${stdout}`);
 			});
-			textRespond('<h1>Shutting down the picture frame ...</h1>');
+			textRespond('<h1>Shutting down the picture frame ...</h1>', resp);
 			break;
 		case 'boot':
 			exec('reboot', (error, stdout, stderr) => {
@@ -175,7 +174,7 @@ const performCommand = async (parms) => {
 				}
 				if (stdout) console.log(`stdout: ${stdout}`);
 			});
-			textRespond('<h1>Restarting the picture frame ...</h1>');
+			textRespond('<h1>Restarting the picture frame ...</h1>', resp);
 			break;
 		case 'prev':
 		case 'next':
@@ -191,7 +190,7 @@ const performCommand = async (parms) => {
 				}
 				if (stdout) console.log(`stdout: ${stdout}`);
 			});
-			jsonRespond({});
+			jsonRespond({}, resp);
 			break;
 		case 'dsp':
 			exec('vcgencmd display_power '+parms.oo+' 2', (error, stdout, stderr) => {
@@ -206,13 +205,13 @@ const performCommand = async (parms) => {
 				if (stdout) console.log(`stdout: ${stdout}`);
 			});
 			let oo = +parms.oo ? 'On' : 'Off';
-			textRespond('<h1>Display '+oo+'</h1>');
+			textRespond('<h1>Display '+oo+'</h1>', resp);
 			break;
 		case 'getset':
-			getSettings();
+			getSettings(resp);
 			break;
 		default:
-			jsonRespond(parms);
+			jsonRespond(parms, resp);
 	}
 };
 
@@ -252,18 +251,18 @@ const showPlaylist = (plist) => {
 };
 
 // change the playlist being displayed
-const setPlaylist = async (parms) => {
+const setPlaylist = async (parms, resp) => {
 	console.log(parms);
 	showPlaylist(parms.list);
-	jsonRespond({});
+	jsonRespond({}, resp);
 };
 
 // delete a playlist
-const delPlaylist = async (parms) => {
+const delPlaylist = async (parms, resp) => {
 	console.log(parms);
 	if (parms.delp==curPlist) {
-		gresp.writeHead(405);
-		gresp.end('Can not delete the currently running playlist.\n');
+		resp.writeHead(405);
+		resp.end('Can not delete the currently running playlist.\n');
 		return;
 	}
 	try {
@@ -272,11 +271,11 @@ const delPlaylist = async (parms) => {
 	} catch (err) {
 		console.error(err.message);
 	}
-	getPlaylists(()=>jsonRespond({}));
+	getPlaylists(()=>jsonRespond({}, resp));
 };
 
 // refresh a playlist
-const refrPlaylist = async (parms) => {
+const refrPlaylist = async (parms, resp) => {
 	//console.log(parms);
 	let ttl = parms.refr;
 	console.log('Refreshing: ',ttl);
@@ -287,15 +286,15 @@ const refrPlaylist = async (parms) => {
 			getPlayList(lstp.plk, ttl, false);
 		}
 	});
-	jsonRespond({});
+	jsonRespond({}, resp);
 };
 
 // add a new playlist
-const addPlaylist = async (parms) => {
+const addPlaylist = async (parms, resp) => {
 	console.log(parms);
 	readFile('static/getnpl.htm', (error, content) => {
-		gresp.writeHead(200, { 'Content-Type': 'text/html' });
-		gresp.end(content, 'utf-8');
+		resp.writeHead(200, { 'Content-Type': 'text/html' });
+		resp.end(content, 'utf-8');
 	});
 };
 
@@ -331,7 +330,7 @@ console.log('plk: ',plk);
 };
 
 // add a new playlist
-const newPlaylist = (parms) => {
+const newPlaylist = (parms, resp) => {
 	let plk = Buffer.from(parms.plk,'base64').toString('utf8');
 	let ttl = parms.ttl;
 	let dcttl = Buffer.from(parms.ttl,'base64').toString('utf8');
@@ -346,7 +345,7 @@ const newPlaylist = (parms) => {
 	// creating files above is async
 	// but just respond anyway, hoping there was success
 //	textRespond(`<span class="good">Playlist "${dcttl}" added to picture frame.</span>`);
-	textRespond(`Playlist "${dcttl}" added to picture frame.`);
+	textRespond(`Playlist "${dcttl}" added to picture frame.`, resp);
 };
 
 // wait until X window access is authorized
@@ -373,7 +372,7 @@ function waitX () {
 	});
 }
 
-function setSettings (parms) {
+function setSettings (parms, resp) {
 	console.log(parms);
 	if (parms.timeon) {
 		SS.ontime = +(parms.timeon.replace(':',''));
@@ -384,11 +383,11 @@ function setSettings (parms) {
 	writeFile(SETSF, JSON.stringify(SS), err => {
 		if (err) { console.error(err); }
 	});
-	textRespond('Settings Saved');
+	textRespond('Settings Saved', resp);
 }
 
-function getSettings () {
-	jsonRespond(SS);
+function getSettings (resp) {
+	jsonRespond(SS, resp);
 }
 
 
@@ -401,8 +400,6 @@ http.createServer(function (request, response) {
 		console.log('[Debug] Decoded:', decodeURI(url));
 	}
 
-	gresp = response;
-
 	if (method=='POST') {
 		let body = '';
 		request.on('error', (err) => {
@@ -413,33 +410,33 @@ http.createServer(function (request, response) {
 			response.on('error', (err) => {
 				console.error(err);
 			});
-			newPlaylist(JSON.parse(body));
+			newPlaylist(JSON.parse(body), response);
 		});
 		return;
 	}
 
 	if (url.startsWith('/?list')) {
-		setPlaylist(parse(url.substring(2)));
+		setPlaylist(parse(url.substring(2)), response);
 		return;
 	}
 	if (url.startsWith('/?cmd')) {
-		performCommand(parse(url.substring(2)));
+		performCommand(parse(url.substring(2)), response);
 		return;
 	}
 	if (url.startsWith('/?nplk')) {
-		addPlaylist(parse(url.substring(2)));
+		addPlaylist(parse(url.substring(2)), response);
 		return;
 	}
 	if (url.startsWith('/?delp')) {
-		delPlaylist(parse(url.substring(2)));
+		delPlaylist(parse(url.substring(2)), respoonse);
 		return;
 	}
 	if (url.startsWith('/?refr')) {
-		refrPlaylist(parse(url.substring(2)));
+		refrPlaylist(parse(url.substring(2)), response);
 		return;
 	}
 	if (url.startsWith('/settings?')) {
-		setSettings(parse(url.substring(10)));
+		setSettings(parse(url.substring(10)), response);
 		return;
 	}
 
