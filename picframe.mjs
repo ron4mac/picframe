@@ -40,6 +40,24 @@ process.on('SIGINT', signal => {
 	process.exit(0);
 });
 
+// check room lighting
+const liteck = () => {
+        let date_time = new Date();
+        let ctim = +(''+date_time.getHours()+date_time.getMinutes());
+        //console.log(ctim+' HOURS');
+
+        if (dspOn && (ctim > SS.offtime)) {
+                dspOn = false;
+                console.log('DISPLAY OFF');
+                exec('DISPLAY=:0 xset dpms force off');
+        }
+        if (!dspOn && (ctim < SS.offtime && ctim > SS.ontime)) {
+                dspOn = true;
+                console.log('DISPLAY ON');
+                exec('DISPLAY=:0 xset dpms force on');
+        }
+};
+
 // serve a file
 const serveFile = (filePath, response, url) => {
 	console.log('SERVE FILE: '+filePath);
@@ -149,7 +167,7 @@ const performCommand = async (parms, resp) => {
 			});
 			break;
 		case 'poff':
-			exec('shutdown -h now', (error, stdout, stderr) => {
+			exec('sudo shutdown -h now', (error, stdout, stderr) => {
 				if (error) {
 					console.error(`error: ${error.message}`);
 					return;
@@ -163,7 +181,7 @@ const performCommand = async (parms, resp) => {
 			textRespond('<h1>Shutting down the picture frame ...</h1>', resp);
 			break;
 		case 'boot':
-			exec('reboot', (error, stdout, stderr) => {
+			exec('sudo reboot', (error, stdout, stderr) => {
 				if (error) {
 					console.error(`error: ${error.message}`);
 					return;
@@ -193,7 +211,8 @@ const performCommand = async (parms, resp) => {
 			jsonRespond({}, resp);
 			break;
 		case 'dsp':
-			exec('vcgencmd display_power '+parms.oo+' 2', (error, stdout, stderr) => {
+			const oo = +parms.oo ? 'on' : 'off';
+			exec('DISPLAY=:0 xset dpms force '+oo, (error, stdout, stderr) => {
 				if (error) {
 					console.error(`error: ${error.message}`);
 					return;
@@ -204,7 +223,7 @@ const performCommand = async (parms, resp) => {
 				}
 				if (stdout) console.log(`stdout: ${stdout}`);
 			});
-			let oo = +parms.oo ? 'On' : 'Off';
+			//let oo = +parms.oo ? 'On' : 'Off';
 			textRespond('<h1>Display '+oo+'</h1>', resp);
 			break;
 		case 'getset':
@@ -428,7 +447,7 @@ http.createServer(function (request, response) {
 		return;
 	}
 	if (url.startsWith('/?delp')) {
-		delPlaylist(parse(url.substring(2)), respoonse);
+		delPlaylist(parse(url.substring(2)), response);
 		return;
 	}
 	if (url.startsWith('/?refr')) {
@@ -469,5 +488,7 @@ http.createServer(function (request, response) {
 		}
 		waitX();
 	});
+        // watch room lighting
+        setInterval(liteck, 60000);
 });
 
