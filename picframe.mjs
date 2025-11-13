@@ -23,39 +23,51 @@ const SETSF = 'settings.json';
 // dynamic variables
 var playLists = null;
 var curPlist = null;
-//var fehp = null;	// feh process
+var curPlprms = null;
 var dspOn = true;
-//var ontime = 700;
-//var offtime = 2000;
 var SS = {ontime: 700, offtime: 2000};
 
 process.on('SIGTERM', signal => {
 	console.log(`Process ${process.pid} received a SIGTERM signal`);
-//	if (fehp) fehp.kill('SIGTERM');
 	process.exit(0);
 });
 process.on('SIGINT', signal => {
 	console.log(`Process ${process.pid} received a SIGINT signal`);
-//	if (fehp) fehp.kill('SIGTERM');
 	process.exit(0);
 });
 
-// check room lighting
-const liteck = () => {
-        let date_time = new Date();
-        let ctim = +(''+date_time.getHours()+date_time.getMinutes());
-        //console.log(ctim+' HOURS');
+// manage display on/off times and check for playlist update
+const periodic = () => {
+	let date_time = new Date();
+	let ctim = +(''+date_time.getHours()+date_time.getMinutes());
 
-        if (dspOn && (ctim > SS.offtime)) {
-                dspOn = false;
-                console.log('DISPLAY OFF');
-                exec('DISPLAY=:0 xset dpms force off');
-        }
-        if (!dspOn && (ctim < SS.offtime && ctim > SS.ontime)) {
-                dspOn = true;
-                console.log('DISPLAY ON');
-                exec('DISPLAY=:0 xset dpms force on');
-        }
+	if (dspOn && (ctim > SS.offtime)) {
+		dspOn = false;
+		exec('DISPLAY=:0 xset dpms force off; killall -q feh');
+	}
+	if (!dspOn && (ctim < SS.offtime && ctim > SS.ontime)) {
+		dspOn = true;
+		showPlaylist(curPlist);
+		exec('DISPLAY=:0 xset dpms force on');
+	}
+
+	// if the display is on and there is a playlist, check remote for a playlist update
+	if (dspOn && curPlist && curPlprms) {
+		let str = '';
+		let req = https.get(curPlprms.plk+"&pco=1", (resp) => {
+			resp.on('data', (chunk) => {
+				str += chunk;
+			}).on('end', () => {
+				if (str != curPlprms.pcnt) {
+					// need to update the playlist
+					// need to kill feh first
+					exec('killall -q feh', (error, stdout, stderr) => {
+						getPlayList(curPlprms.plk, curPlist, false);
+					});
+				}
+			});
+		}).end();
+	}
 };
 
 // serve a file
@@ -197,7 +209,7 @@ const performCommand = async (parms, resp) => {
 		case 'prev':
 		case 'next':
 			let sig = parms.cmd == 'prev' ? '-12' : '-10';
-			exec(`killall ${sig} feh`, (error, stdout, stderr) => {
+			exec(`killall -q ${sig} feh`, (error, stdout, stderr) => {
 				if (error) {
 					console.error(`error: ${error.message}`);
 					return;
@@ -235,26 +247,23 @@ const performCommand = async (parms, resp) => {
 };
 
 const fehRun = (plist, dly='5.0') => {
-	//// SHOULD THE PLAYLIST BE UPDATED FIRST?
-//	exec('killall -9 feh');
-//	exec(`DISPLAY=:0.0 feh -D ${dly} --fullscreen --auto-zoom -f playlists/${plist} &`, (error, stdout, stderr) => {
 	console.log(`Running playlist ${plist}`);
-//	exec(`DISPLAY=:0.0 feh -D ${dly} -F -Y -Z -f playlists/${plist}`, (error, stdout, stderr) => {
-	exec(`killall -15 feh; DISPLAY=:0.0 feh -D ${dly} -F -Y -Z -f playlists/${plist}`, {uid:1000}, (error, stdout, stderr) => {
+	exec(`DISPLAY=:0.0 feh -D ${dly} -F -Y -Z -f playlists/${plist}`, {uid:1000}, (error, stdout, stderr) => {
 		if (error) {
-			console.error(`error: ${error.message}`);
-			return;
+			if (error.code != 143) {
+				console.error(error);
+		}
 		}
 		if (stderr) {
-			console.error(`stderr: ${stderr}`);
-			return;
+			console.error(`fehRun_stderr: ${stderr}`);
 		}
-		if (stdout) console.log(`stdout: ${stdout}`);
+		if (stdout) console.log(`fehRun_stdout: ${stdout}`);
 	});
 };
 
 const showPlaylist = (plist) => {
 	if (!plist) return;
+	exec('killall -q feh');
 	curPlist = plist;
 	console.log('SPLREAD: '+PLKEYSFS+plist);
 	readFile(PLKEYSFS+plist, (error, content) => {
@@ -264,8 +273,8 @@ const showPlaylist = (plist) => {
 			return;
 		}
 		console.log('SPLKEY: '+content);
-	//	console.log(JSON.parse(content));
-		fehRun(plist, JSON.parse(content).sdly);
+		curPlprms = JSON.parse(content);
+		fehRun(plist, curPlprms.sdly);
 	});
 };
 
@@ -320,7 +329,6 @@ const addPlaylist = async (parms, resp) => {
 // get playlist contents and write to file
 const getPlayList = (plk, ttl, nupl=true) => {
 	let str = '';
-console.log('plk: ',plk);
 	let req = https.get(plk, (resp) => {
 		resp.on('data', (chunk) => {
 			str += chunk;
@@ -330,7 +338,6 @@ console.log('plk: ',plk);
 			writeFile(PLISTSFS+ttl, plist[1], err => {
 				if (err) console.error(err);
 				if (nupl && playLists.indexOf(ttl) == -1) playLists.push(ttl);
-//not here				showPlaylist(ttl);
 			});
 			readFile(PLKEYSFS+ttl, (error, content) => {
 				if (error) {
@@ -340,7 +347,7 @@ console.log('plk: ',plk);
 					parms.pcnt = plist[0];
 					writeFile(PLKEYSFS+ttl, JSON.stringify(parms), err => {
 						if (err) { console.error(err); }
-						showPlaylist(ttl);	// okay do it here
+						showPlaylist(ttl);
 					});
 				}
 			});
@@ -358,12 +365,8 @@ const newPlaylist = (parms, resp) => {
 	console.log(plk,dcttl,pcnt,sdly);
 	writeFile(PLKEYSFS+ttl, JSON.stringify({pcnt: pcnt, sdly: sdly, plk: plk}), err => {
 		if (err) { console.error(err); }
-	getPlayList(plk, ttl, true);
+		getPlayList(plk, ttl, true);
 	});
-//	getPlayList(plk, ttl, true);
-	// creating files above is async
-	// but just respond anyway, hoping there was success
-//	textRespond(`<span class="good">Playlist "${dcttl}" added to picture frame.</span>`);
 	textRespond(`Playlist "${dcttl}" added to picture frame.`, resp);
 };
 
@@ -459,7 +462,7 @@ http.createServer(function (request, response) {
 		return;
 	}
 
-	let filePath = parse(url.substring(1));	///.split('?').shift();		//url.split('?').shift();	//url;
+	let filePath = parse(url.substring(1)); ///.split('?').shift();		//url.split('?').shift();	//url;
 
 	// Correct root path
 	if (filePath === '/') {
@@ -488,7 +491,7 @@ http.createServer(function (request, response) {
 		}
 		waitX();
 	});
-        // watch room lighting
-        setInterval(liteck, 60000);
+	// manage display on/off times and check for playlist update
+	setInterval(periodic, 60000);
 });
 
