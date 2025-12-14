@@ -25,6 +25,15 @@ cd /etc/systemd/system
 sudo ln -s /home/admin/picframe/picframe.service picframe.service
 cd ~/picframe
 
+# create file 'service_vars'
+nano service_vars
+# file Content ==========================================
+XAUTHORITY=/home/nimda/.Xauthority
+ADMIN_PASSWORD="<password>"
+#if hostname is not 'picframe' provide proper URL
+#LOCAL_PICFRAME="http://picframedev.local"
+# =======================================================
+
 # enable xserver authority
 touch ~/.Xauthority
 xauth generate :0 . trusted

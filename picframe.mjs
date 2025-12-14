@@ -14,6 +14,7 @@ const enableUrlDecoding = true;
 const hostname = process.env.NODE_WEB_HOST || '0.0.0.0';
 const port = process.env.NODE_WEB_PORT || 80;
 const localUrl = process.env.LOCAL_PICFRAME || 'http://picframe.local';
+const adminPass = process.env.ADMIN_PASSWORD || '\t';
 const PLISTS = 'playlists';
 const PLISTSFS = PLISTS+'/';
 const PLKEYS = 'plkeys';
@@ -24,6 +25,7 @@ const SETSF = 'settings.json';
 var playLists = null;
 var curPlist = null;
 var curPlprms = null;
+var dspDim = '1280x800';
 var dspOn = true;
 var SS = {ontime: 700, offtime: 2000};
 
@@ -104,8 +106,7 @@ const serveFile = (filePath, response, url) => {
 				readFile(filePath+'/index.html', 'utf8', function(error, content) {
 					if (error) { console.error(error); }
 					else {
-						// substitue for local pic frame
-						content = content.replaceAll('%%LOCAL_PICFRAME%%', localUrl);
+						content = htmlReplace(content);
 						response.setHeader('Cache-Control', ['no-cache','max-age=0']);
 						response.writeHead(200, { 'Content-Type':'text/html' });
 						response.end(content, 'utf-8');
@@ -124,9 +125,8 @@ const serveFile = (filePath, response, url) => {
 		}
 		else {
 			if (contentType=='text/html') {
+				content = htmlReplace(content);
 				response.setHeader('Cache-Control', ['no-cache','max-age=0']);
-				// substitue for local pic frame
-				content = content.replaceAll('%%LOCAL_PICFRAME%%', localUrl);
 			}
 			response.writeHead(200, { 'Content-Type':contentType });
 			response.end(content, 'utf-8');
@@ -135,6 +135,13 @@ const serveFile = (filePath, response, url) => {
 		}
 	});
 };
+
+// replace html placeholders with actual values
+const htmlReplace = (htm) => {
+	htm = htm.replaceAll('%%LOCAL_PICFRAME%%', localUrl);
+	htm = htm.replaceAll('%%ADMIN_PASSWORD%%', adminPass);
+	return htm;
+}
 
 // send back some JSON data
 const jsonRespond = (data, resp) => {
@@ -329,7 +336,7 @@ const addPlaylist = async (parms, resp) => {
 // get playlist contents and write to file
 const getPlayList = (plk, ttl, nupl=true) => {
 	let str = '';
-	let req = https.get(plk, (resp) => {
+	let req = https.get(plk+'&ddim='+dspDim, (resp) => {
 		resp.on('data', (chunk) => {
 			str += chunk;
 		}).on('end', () => {
@@ -412,6 +419,13 @@ function getSettings (resp) {
 	jsonRespond(SS, resp);
 }
 
+/*
+should consider using this to get the display resolution
+exec("DISPLAY=:0 xrandr --current | grep '*' | awk '{print $1}'", (error, stdout, stderr) => {
+	//resolution in stdout
+	console.log([error, stdout, stderr]);
+});
+*/
 
 // Web server
 http.createServer(function (request, response) {

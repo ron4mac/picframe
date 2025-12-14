@@ -52,7 +52,7 @@
 	crossorigin="anonymous" referrerpolicy="no-referrer" />
 <script>
 	if (!localStorage.getItem('adminok')) {
-		if (prompt('Please validate','')=='1376') {
+		if (prompt('Please validate','')=='%%ADMIN_PASSWORD%%') {
 			localStorage.setItem('adminok', true);
 		} else {
 			history.back();
