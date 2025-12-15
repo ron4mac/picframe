@@ -28,7 +28,7 @@ cd ~/picframe
 # create file 'service_vars'
 nano service_vars
 # file Content ==========================================
-XAUTHORITY=/home/nimda/.Xauthority
+XAUTHORITY=/home/admin/.Xauthority
 ADMIN_PASSWORD="<password>"
 #if hostname is not 'picframe' provide proper URL
 #LOCAL_PICFRAME="http://picframedev.local"
