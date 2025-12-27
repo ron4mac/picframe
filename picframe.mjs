@@ -255,7 +255,9 @@ const performCommand = async (parms, resp) => {
 
 const fehRun = (plist, dly='5.0') => {
 	console.log(`Running playlist ${plist}`);
-	exec(`DISPLAY=:0.0 feh -D ${dly} -F -Y -Z -f playlists/${plist}`, {uid:1000}, (error, stdout, stderr) => {
+	//exec(`DISPLAY=:0 feh -D ${dly} -F -Y -Z -f playlists/${plist}`, {uid:1000}, (error, stdout, stderr) => {
+	// changed to randomize each cycle thru list and get list from STDIN to prevent feh modifying playlist file
+	exec(`DISPLAY=:0 feh -D ${dly} -F -Y -Z -z -f - < playlists/${plist}`, {uid:1000}, (error, stdout, stderr) => {
 		if (error) {
 			if (error.code != 143) {
 				console.error(error);
