@@ -23,11 +23,10 @@ const SETSF = 'settings.json';
 
 // dynamic variables
 var playLists = null;
-var curPlist = null;
 var curPlprms = null;
 var dspDim = '1280x800';
 var dspOn = true;
-var SS = {ontime: 700, offtime: 2000};
+var SS = {ontime: 700, offtime: 2000, curPlist: null};
 
 process.on('SIGTERM', signal => {
 	console.log(`Process ${process.pid} received a SIGTERM signal`);
@@ -49,12 +48,12 @@ const periodic = () => {
 	}
 	if (!dspOn && (ctim < SS.offtime && ctim > SS.ontime)) {
 		dspOn = true;
-		showPlaylist(curPlist);
+		showPlaylist(SS.curPlist);
 		exec('DISPLAY=:0 xset dpms force on');
 	}
 
 	// if the display is on and there is a playlist, check remote for a playlist update
-	if (dspOn && curPlist && curPlprms) {
+	if (dspOn && SS.curPlist && curPlprms) {
 		let str = '';
 		let req = https.get(curPlprms.plk+"&pco=1", (resp) => {
 			resp.on('data', (chunk) => {
@@ -64,7 +63,7 @@ const periodic = () => {
 					// need to update the playlist
 					// need to kill feh first
 					exec('killall -q feh', (error, stdout, stderr) => {
-						getPlayList(curPlprms.plk, curPlist, false);
+						getPlayList(curPlprms.plk, SS.curPlist, false);
 					});
 				}
 			});
@@ -182,7 +181,7 @@ const performCommand = async (parms, resp) => {
 						console.error(err.message);
 					}
 				});
-				jsonRespond({curlst:curPlist,lists:plists}, resp);
+				jsonRespond({curlst:SS.curPlist,lists:plists}, resp);
 			});
 			break;
 		case 'poff':
@@ -273,7 +272,9 @@ const fehRun = (plist, dly='5.0') => {
 const showPlaylist = (plist) => {
 	if (!plist) return;
 	exec('killall -q feh');
-	curPlist = plist;
+	let chngd = plist != SS.curPlist
+	SS.curPlist = plist;
+	if (chngd) saveSettings();
 	console.log('SPLREAD: '+PLKEYSFS+plist);
 	readFile(PLKEYSFS+plist, (error, content) => {
 		if (error) {
@@ -297,7 +298,7 @@ const setPlaylist = async (parms, resp) => {
 // delete a playlist
 const delPlaylist = async (parms, resp) => {
 	console.log(parms);
-	if (parms.delp==curPlist) {
+	if (parms.delp==SS.curPlist) {
 		resp.writeHead(405);
 		resp.end('Can not delete the currently running playlist.\n');
 		return;
@@ -381,8 +382,6 @@ const newPlaylist = (parms, resp) => {
 
 // wait until X window access is authorized
 function waitX () {
-	//showPlaylist(curPlist);
-	//return;
 	if (typeof waitX.cnt === 'undefined') {
 		waitX.cnt = 5;
 	}
@@ -395,7 +394,7 @@ function waitX () {
 		if (stderr) {console.log(`stderr: ${stderr}`);return;}
 		console.log(`stdout: ${stdout}`);
 		if (stdout.indexOf('SI:localuser')>0) {
-			showPlaylist(curPlist);
+			showPlaylist(SS.curPlist);
 		} else {
 			waitX.cnt--;
 			setTimeout(waitX, 5000);
@@ -411,13 +410,19 @@ function setSettings (parms, resp) {
 	if (parms.timeoff) {
 		SS.offtime = +(parms.timeoff.replace(':',''));
 	}
+	saveSettings();
+	textRespond('Settings Saved', resp);
+	console.log('set: ',SS);
+}
+
+function saveSettings () {
 	writeFile(SETSF, JSON.stringify(SS), err => {
 		if (err) { console.error(err); }
 	});
-	textRespond('Settings Saved', resp);
 }
 
 function getSettings (resp) {
+	console.log('get: ',SS);
 	jsonRespond(SS, resp);
 }
 
@@ -428,6 +433,10 @@ exec("DISPLAY=:0 xrandr --current | grep '*' | awk '{print $1}'", (error, stdout
 	console.log([error, stdout, stderr]);
 });
 */
+
+// read the settings
+if (existsSync(SETSF)) SS = JSON.parse(readFileSync(SETSF));
+
 
 // Web server
 http.createServer(function (request, response) {
@@ -503,7 +512,7 @@ http.createServer(function (request, response) {
 	// get playlists and start a random one
 	getPlaylists(()=>{
 		if (playLists) {
-			curPlist = playLists[playLists.length * Math.random() | 0];
+			if (!SS.curPlist) SS.curPlist = playLists[playLists.length * Math.random() | 0];
 		}
 		waitX();
 	});
