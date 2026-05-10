@@ -3,7 +3,7 @@ Digital picture frame
 
 The companion web app, [Simple-Photo-Gallery](https://github.com/ron4mac/simple-photo-gallery) is used for the photo repository.
 
-Setup on raspberry pi (assuming hostname picframe and user admin)
+Setup on raspberry pi (assuming hostname picframe and user admin - change as appropriate)
 ```
 # download the picframe software package from github
 wget "https://ron4mac@github.com/ron4mac/picframe/archive/main.zip"
@@ -17,12 +17,17 @@ sudo apt install xserver-xorg xinit x11-xserver-utils
 sudo apt install lightdm
 sudo apt install feh
 
-# edit /etc/lightdm/lightdm.conf to autologin in user (admin)
+# edit /etc/lightdm/lightdm.conf to autologin in user (admin) and keep display on
 sudo nano /etc/lightdm/lightdm.conf
+to [Seat:*] section add:
+autologin-user=admin
+xserver-command=X -s 0 -dpms
+
 # allow node to use port 80
 sudo setcap 'cap_net_bind_service=+ep' /usr/bin/node
 
 # setup systemd service
+modify picframe.service file as necessary for user/home
 cd /etc/systemd/system
 sudo ln -s /home/admin/picframe/picframe.service picframe.service
 cd ~/picframe
