@@ -45,9 +45,6 @@ ADMIN_PASSWORD="<password>"
 touch ~/.Xauthority
 xauth generate :0 . trusted
 
-# keep display from sleeping
-DISPLAY=:0 xset s 0
-
 #enable and start services
 sudo systemctl enable lightdm
 sudo systemctl enable picframe
