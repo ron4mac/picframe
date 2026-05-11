@@ -3,7 +3,7 @@ Digital picture frame
 
 The companion web app, [Simple-Photo-Gallery](https://github.com/ron4mac/simple-photo-gallery) is used for the photo repository.
 
-Setup on raspberry pi (assuming hostname picframe and user admin - change as appropriate)
+Setup on raspberry pi (assuming hostname picframe and user admin - change as appropriate)  
 Start with Raspberry Pi OS lite (no desktop).
 ```
 # download the picframe software package from github
