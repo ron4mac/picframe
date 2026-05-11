@@ -21,7 +21,7 @@ sudo apt install feh
 sudo nano /etc/lightdm/lightdm.conf
 to [Seat:*] section add:
 autologin-user=admin
-xserver-command=X -s 0 -dpms
+xserver-command=X -s 0
 
 # allow node to use port 80
 sudo setcap 'cap_net_bind_service=+ep' /usr/bin/node
