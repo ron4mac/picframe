@@ -7,7 +7,7 @@ Setup on raspberry pi (assuming hostname picframe and user admin - change as app
 Start with Raspberry Pi OS lite (no desktop).
 ```
 # download the picframe software package from github
-wget "https://ron4mac@github.com/ron4mac/picframe/archive/main.zip"
+wget "https://ron4mac@github.com/ron4mac/picframe/archive/V2fbi.zip"
 unzip main.zip
 mv picframe-main picframe
 unlink main.zip
