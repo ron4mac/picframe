@@ -1,0 +1,17 @@
+[Unit]
+Description=Disable cursor blink on tty1
+DefaultDependencies=no
+After=cloud-init.target multi-user.target
+Wants=cloud-init.target
+Before=picframe.service
+
+[Service]
+Type=oneshot
+ExecStartPre=/bin/sleep 12
+ExecStart=/bin/bash -c 'TERM=linux setterm --cursor off > /dev/tty1; TERM=linux clear > /dev/tty1'
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

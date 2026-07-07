@@ -14,40 +14,29 @@ unlink main.zip
 
 # install other needed software
 sudo apt install nodejs
-sudo apt install xserver-xorg xinit x11-xserver-utils
-sudo apt install lightdm
-sudo apt install feh
-
-# edit /etc/lightdm/lightdm.conf to autologin in user (admin) and keep display on
-sudo nano /etc/lightdm/lightdm.conf
-to [Seat:*] section add:
-autologin-user=admin
-xserver-command=X -s 0
+sudo apt install fbi
 
 # allow node to use port 80
 sudo setcap 'cap_net_bind_service=+ep' /usr/bin/node
 
-# setup systemd service
+# setup systemd services
 modify picframe.service file as necessary for user/home
 cd /etc/systemd/system
+sudo ln -s /home/admin/picframe/cursor-off.service cursor-off.service
 sudo ln -s /home/admin/picframe/picframe.service picframe.service
 cd ~/picframe
 
 # create file 'service_vars'
 nano service_vars
 # file Content ==========================================
-XAUTHORITY=/home/admin/.Xauthority
+#password to administer the picframe
 ADMIN_PASSWORD="<password>"
 #if hostname is not 'picframe' provide proper URL
 #LOCAL_PICFRAME="http://picframedev.local"
 # =======================================================
 
-# enable xserver authority
-touch ~/.Xauthority
-xauth generate :0 . trusted
-
 #enable and start services
-sudo systemctl enable lightdm
+sudo systemctl enable cursor-off
 sudo systemctl enable picframe
 
 # time to reboot

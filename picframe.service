@@ -1,19 +1,19 @@
 [Unit]
 Description=Picture Frame
-#Wants=network-online.target graphical.target
-#After=network-online.target graphical.target
-Wants=graphical.target
-After=lightdm.service
+After=multi-user.target cursor-off.service
+Wants=cursor-off.service
+# Only if the app needs network before it can load content:
+Wants=network-online.target
+After=network-online.target
 StartLimitIntervalSec=300
 StartLimitBurst=5
 
 [Service]
 WorkingDirectory=/home/admin/picframe
-#Environment="XAUTHORITY=/home/admin/.Xauthority"
 EnvironmentFile=/home/admin/picframe/service_vars
 ExecStart=node /home/admin/picframe/picframe.mjs
 Restart=always
-RestartSec=60s
+RestartSec=30s
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=picframe

@@ -6,6 +6,14 @@
 <title>PicFrame Manager</title>
 <link href="static/style.css" rel="stylesheet">
 <style type="text/css">
+.edtact {
+	color:orange;
+	margin-right: 0.5rem;
+}
+.edtact:hover {
+	color: crimson;
+	cursor: pointer;
+}
 .rfract {
 	color:lightblue;
 	margin-right: 0.5rem;
@@ -22,7 +30,7 @@
 	color: red;
 	cursor: pointer;
 }
-#podlg {
+#podlg, #pledtdlg {
 	position: absolute;
 	right: 5em;
 	top: 5em;
@@ -34,13 +42,35 @@
 	font-size: larger;
 	box-shadow: #CCC 0.2rem 0.2rem 1rem;
 }
-.act {
+#pledtdlg {
+	left: 10em;
+	right: auto;
+	top: 10em;
+}
+.edform {
+	display: grid;
+	grid-template-columns: auto auto;
+	column-gap: .5rem;
+	row-gap: .4rem;
+}
+.edform input {
+	font-size: large;
+}
+.act, .pledact {
 	margin-top: 0.5rem;
 	border-top: 1px solid #CCC;
-	padding: 1rem;
+	padding-top: 0.5rem;
 }
 .act button {
 	font-size: large;
+}
+.pledact {
+	display: flex;
+	justify-content: flex-end;
+}
+.pledact button {
+	font-size: large;
+	margin-left: 1rem;
 }
 #hdr a {
 	font-size: large;
@@ -88,6 +118,13 @@
 	<button onclick="dspSet(0)">Display Off</button>
 	<button onclick="dspSet(1)">Display On</button>
 </div>
+<div id="pledtdlg">
+	<div class="edform">
+		<label for="plNam">Playlist Name: </label><input type="text" id="plNam" name="plNam" value="">
+		<label for="plDly">Delay (sec): </label><input type="number" id="plDly" name="plDly" min="20" step="10" value="">
+	</div>
+	<div class="pledact"><button onclick="plSav(false)"> Cancel </button><button onclick="plSav(true)"> Save </button></div>
+</div>
 <div id="podlg">
 	<input type="radio" id="poOff" name="poOpt" value="poff" checked> <label for="poOff">Shut Down</label><br>
 	<input type="radio" id="poBoot" name="poOpt" value="boot"> <label for="poBoot">Restart</label>
@@ -95,6 +132,7 @@
 </div>
 <script>
 	var actvl = null;
+	var ovs = {};
 	document.getElementById('plists').addEventListener('click', evt => {
 		console.log(evt);
 		let lem = evt.target;
@@ -124,6 +162,9 @@
 					})
 					.catch(err => alert('Failure: '+err));
 				}
+				break;
+			case 'edtact':
+				doPled(pln, lem.dataset.sdly);
 		}
 	});
 	const galURL = '%%LOCAL_PICFRAME%%';
@@ -140,15 +181,44 @@
 			let lnks = data.lists.map(lst => {
 				let actc = lst.ttl==curr ? ' activ' : '';
 				let dlbt = lst.ttl==curr ? '' : `<span class="delact" data-pln="${lst.ttl}"> <i class="fa fa-times" aria-hidden="true"></i></span>`;
+				let prps = `${lst.pcnt} Photos : ${lst.sdly} Seconds`;
 				let refr = `<span class="rfract" data-pln="${lst.ttl}"> <i class="fa fa-refresh" aria-hidden="true"></i></span>`;
+				let edt = lst.ttl==curr ? '' : `<span class="edtact" data-pln="${lst.ttl}" data-sdly="${lst.sdly}"> <i class="fa fa-pencil-square-o" aria-hidden="true"></i></span> `;
 				let ttl = atob(lst.ttl);
-				return `<div class="plst${actc}"><div class="plst-ttl">${refr} ${ttl} ${dlbt}</div></div>`;
+				return `<div class="plst${actc}"><div class="plst-ttl">${edt}${refr} ${ttl} ${dlbt}</div><div>${prps}</div></div>`;
 			});
 			document.getElementById('plists').innerHTML = lnks.join('<br>');
 			actvl = document.querySelector('.plst.activ');
 		})
 		.catch(err => alert('Failure: '+err));
 	}
+	const doPled = (pln, sdly) => {
+		console.log(pln);
+		const dlg = document.getElementById('pledtdlg');
+		dlg.querySelector('#plNam').value = ovs.pln = atob(pln);
+		dlg.querySelector('#plDly').value = ovs.sdly = sdly;
+		dlg.style.display = 'block';
+	};
+	const plSav = (save) => {
+		const dlg = document.getElementById('pledtdlg');
+		dlg.style.display = 'none';
+		if (save) {
+			const pln = dlg.querySelector('#plNam').value.trim();
+			const sdly = dlg.querySelector('#plDly').value.trim();
+			if (sdly == ovs.sdly && pln == ovs.pln) {
+				alert('no change');
+				return;
+			}
+			const vals = `pln=${btoa(ovs.pln)}&npln=${btoa(pln)}&nsdly=${sdly}`;
+			fetch('/edt?'+vals, {method:'GET'})
+			.then(resp => { console.log(resp); if (!resp.ok) throw new Error(`HTTP ${resp.status}`); if (false) return resp.json(); else return resp.text() })
+			.then(data => {
+				alert(data);
+				getList();
+			})
+			.catch(err => alert('Failure: '+err));
+		}
+	};
 	const doPO = () => {
 		document.getElementById('podlg').style.display = 'inline-block';
 	};

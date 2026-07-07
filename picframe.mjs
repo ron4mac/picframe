@@ -3,7 +3,7 @@
 import http from 'http';
 import https from 'https';
 import {parse} from 'querystring';
-import {readFile,readFileSync,writeFile,readdir,existsSync,unlinkSync,mkdirSync} from 'fs';
+import {readFile,readFileSync,writeFile,writeFileSync,createWriteStream,readdir,existsSync,unlinkSync,mkdirSync,rmSync,renameSync} from 'fs';
 import path from 'path';
 import {exec} from 'child_process';
 
@@ -13,6 +13,7 @@ const debugMode = false;
 const enableUrlDecoding = true;
 const hostname = process.env.NODE_WEB_HOST || '0.0.0.0';
 const port = process.env.NODE_WEB_PORT || 80;
+const dspDim = process.env.FRAME_RESOLUTION || '1280x800';
 const localUrl = process.env.LOCAL_PICFRAME || 'http://picframe.local';
 const adminPass = process.env.ADMIN_PASSWORD || '\t';
 const PLISTS = 'playlists';
@@ -24,8 +25,8 @@ const SETSF = 'settings.json';
 // dynamic variables
 var playLists = null;
 var curPlprms = null;
-var dspDim = '1280x800';
-var dspOn = true;
+//var dspDim = '1280x800';
+var dspOn = false;
 var SS = {ontime: 700, offtime: 2000, curPlist: null};
 
 process.on('SIGTERM', signal => {
@@ -37,21 +38,33 @@ process.on('SIGINT', signal => {
 	process.exit(0);
 });
 
+const displayOn = (oo) => {
+	const val = oo ? 0 : 1;
+	exec(`sudo sh -c 'echo ${val} > /sys/class/graphics/fb0/blank'`);
+};
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const popMsgImg = async (img) => {
+	const exp = exec(`fbi -a --noverbose ${img}`);
+	await delay(4000);
+	exp.kill();
+};
+
 // manage display on/off times and check for playlist update
 const periodic = () => {
 	let date_time = new Date();
 	let ctim = +(''+date_time.getHours()+date_time.getMinutes());
-
 	if (dspOn && (ctim > SS.offtime)) {
 		dspOn = false;
-		exec('DISPLAY=:0 xset dpms force off; killall -q feh');
+		exec('killall -q fbi');
+		displayOn(false);
 	}
 	if (!dspOn && (ctim < SS.offtime && ctim > SS.ontime)) {
 		dspOn = true;
+		displayOn(true);
 		showPlaylist(SS.curPlist);
-		exec('DISPLAY=:0 xset dpms force on');
-	}
 
+	}
 	// if the display is on and there is a playlist, check remote for a playlist update
 	if (dspOn && SS.curPlist && curPlprms) {
 		let str = '';
@@ -61,8 +74,11 @@ const periodic = () => {
 			}).on('end', () => {
 				if (str != curPlprms.pcnt) {
 					// need to update the playlist
+					console.log('Reloading playlist: ', SS.curPlist);
 					// need to kill feh first
-					exec('killall -q feh', (error, stdout, stderr) => {
+					exec('killall -q fbi', (error, stdout, stderr) => {
+					//	popMsgImg('static/updating.png').then(()=>getPlayList(curPlprms.plk, SS.curPlist, false));
+					//	popMsgImg('static/updating.png').then(()=>getPlayList(curPlprms.plk, SS.curPlist, false));
 						getPlayList(curPlprms.plk, SS.curPlist, false);
 					});
 				}
@@ -163,6 +179,12 @@ const getPlaylists = (cb) => {
 	});
 };
 
+const sendKey = (key) => {
+	const stream = createWriteStream('/dev/tty1');
+	stream.write(key);
+	stream.end();
+};
+
 // perform command
 const performCommand = async (parms, resp) => {
 	//console.log(parms);
@@ -214,34 +236,18 @@ const performCommand = async (parms, resp) => {
 			break;
 		case 'prev':
 		case 'next':
-			let sig = parms.cmd == 'prev' ? '-12' : '-10';
-			exec(`killall -q ${sig} feh`, (error, stdout, stderr) => {
-				if (error) {
-					console.error(`error: ${error.message}`);
-					return;
-				}
-				if (stderr) {
-					console.error(`stderr: ${stderr}`);
-					return;
-				}
-				if (stdout) console.log(`stdout: ${stdout}`);
-			});
+			const key = parms.cmd == 'prev' ? 'k' : 'j';
+			sendKey(key);
 			jsonRespond({}, resp);
 			break;
 		case 'dsp':
-			const oo = +parms.oo ? 'on' : 'off';
-			exec('DISPLAY=:0 xset dpms force '+oo, (error, stdout, stderr) => {
-				if (error) {
-					console.error(`error: ${error.message}`);
-					return;
-				}
-				if (stderr) {
-					console.error(`stderr: ${stderr}`);
-					return;
-				}
-				if (stdout) console.log(`stdout: ${stdout}`);
-			});
-			//let oo = +parms.oo ? 'On' : 'Off';
+			const oo = +parms.oo ? true : false;
+			if (oo) {
+			//	showPlaylist(SS.curPlist);
+			} else {
+			//	exec('killall -q fbi');
+			}
+			displayOn(oo);
 			textRespond('<h1>Display '+oo+'</h1>', resp);
 			break;
 		case 'getset':
@@ -254,24 +260,64 @@ const performCommand = async (parms, resp) => {
 
 const fehRun = (plist, dly='5.0') => {
 	console.log(`Running playlist ${plist}`);
+//	runFBI(`--noonce -t ${dly} -l playlists/${plist}`);
+	runFBI(`--noonce -t ${dly} -l fbilist`);
+};
+
+const runFBI = (parms) => {
+	console.log(`Running playlist ${parms}`);
 	//exec(`DISPLAY=:0 feh -D ${dly} -F -Y -Z -f playlists/${plist}`, {uid:1000}, (error, stdout, stderr) => {
 	// changed to randomize each cycle thru list and get list from STDIN to prevent feh modifying playlist file
-	exec(`DISPLAY=:0 feh -D ${dly} -F -Y -Z -z -f - < playlists/${plist}`, {uid:1000}, (error, stdout, stderr) => {
+//	exec('setterm --cursor off');
+//	exec(`fbi -a -u --noedit --noverbose --nointeractive ${parms}`, {uid:1000}, (error, stdout, stderr) => {
+	exec(`fbi -a -u --noedit --noverbose ${parms}`, {uid:1000}, (error, stdout, stderr) => {
 		if (error) {
 			if (error.code != 143) {
 				console.error(error);
 		}
 		}
 		if (stderr) {
-			console.error(`fehRun_stderr: ${stderr}`);
+			console.error(`runFBI_stderr: ${stderr}`);
 		}
-		if (stdout) console.log(`fehRun_stdout: ${stdout}`);
+		if (stdout) console.log(`runFBI_stdout: ${stdout}`);
 	});
 };
 
+const downloadImage = async (url, outputPath) => {
+	if (!existsSync(outputPath)) try {
+		const response = await fetch(url);
+		if (!response.ok) {
+			throw new Error(`Failed to fetch image: ${response.statusText} ${url}`);
+		}
+		const arrayBuffer = await response.arrayBuffer();
+		const buffer = Buffer.from(arrayBuffer);
+		writeFileSync(outputPath, buffer);
+//		console.log('Image saved successfully!');
+	} catch (err) {
+		console.error('Error downloading image:', err);
+	}
+}
+
+const buildFbiList = (plist) => {
+	const content = readFileSync(PLISTSFS+plist, 'utf-8');
+	const lines = content.split(/\r?\n/);
+	let pics = [];
+	const imgd = `cache/${plist}/`;
+	mkdirSync(imgd, {recursive: true});
+	const regex = /&p=([^&]+)/;
+	lines.forEach(l => {
+		const match = l.match(regex);
+		pics.push(imgd+match[1]);
+		downloadImage(l, imgd+match[1]);
+	});
+	writeFileSync('fbilist', pics.join('\n'), 'utf-8');
+};
+
 const showPlaylist = (plist) => {
+//console.log('LPIST: '+plist);
 	if (!plist) return;
-	exec('killall -q feh');
+	buildFbiList(plist);
+	exec('killall -q fbi');
 	let chngd = plist != SS.curPlist
 	SS.curPlist = plist;
 	if (chngd) saveSettings();
@@ -306,6 +352,7 @@ const delPlaylist = async (parms, resp) => {
 	try {
 		unlinkSync(PLISTSFS+parms.delp);
 		unlinkSync(PLKEYSFS+parms.delp);
+		rmSync('cache/'+parms.delp, {recursive:true, force:true});
 	} catch (err) {
 		console.error(err.message);
 	}
@@ -380,26 +427,29 @@ const newPlaylist = (parms, resp) => {
 	textRespond(`Playlist "${dcttl}" added to picture frame.`, resp);
 };
 
-// wait until X window access is authorized
-function waitX () {
-	if (typeof waitX.cnt === 'undefined') {
-		waitX.cnt = 5;
+function editPlist (parms, resp) {
+	console.log(parms);
+	if (parms.npln != parms.pln) {
+		try {
+			renameSync(PLKEYSFS+parms.pln, PLKEYSFS+parms.npln);
+			renameSync(PLISTSFS+parms.pln, PLISTSFS+parms.npln);
+			renameSync('cache/'+parms.pln, 'cache/'+parms.npln);
+			parms.pln = parms.npln;
+			console.log('File(s) renamed successfully!');
+		} catch (error) {
+			console.error('Error renaming file:', error.message);
+		}
 	}
-	exec('DISPLAY=:0.0 xhost', {uid:1000}, (error, stdout, stderr) => {
-		if (error) {
-			console.log(`error: ${error.message}`);
-			if (--waitX.cnt) setTimeout(waitX, 5000);
-			return;
-		}
-		if (stderr) {console.log(`stderr: ${stderr}`);return;}
-		console.log(`stdout: ${stdout}`);
-		if (stdout.indexOf('SI:localuser')>0) {
-			showPlaylist(SS.curPlist);
-		} else {
-			waitX.cnt--;
-			setTimeout(waitX, 5000);
-		}
-	});
+	let plvs = JSON.parse(readFileSync(PLKEYSFS+parms.pln));
+	if (parms.nsdly != plvs.sdly) {
+		plvs.sdly = parms.nsdly;
+		writeFile(PLKEYSFS+parms.pln, JSON.stringify(plvs), err => {
+			if (err) { console.error(err); }
+			textRespond('Change(s) made', resp);
+		});
+	} else {
+		textRespond('Change(s) made', resp);
+	}
 }
 
 function setSettings (parms, resp) {
@@ -436,7 +486,8 @@ exec("DISPLAY=:0 xrandr --current | grep '*' | awk '{print $1}'", (error, stdout
 
 // read the settings
 if (existsSync(SETSF)) SS = JSON.parse(readFileSync(SETSF));
-
+//exec('sudo sh -c "setterm --cursor off > /dev/tty1 && clear > /dev/tty1"');
+//exec('sudo sh -c "setterm --cursor off > /dev/tty1"');
 
 // Web server
 http.createServer(function (request, response) {
@@ -464,6 +515,10 @@ http.createServer(function (request, response) {
 
 	if (url.startsWith('/?list')) {
 		setPlaylist(parse(url.substring(2)), response);
+		return;
+	}
+	if (url.startsWith('/edt?')) {
+		editPlist(parse(url.substring(5)), response);
 		return;
 	}
 	if (url.startsWith('/?cmd')) {
@@ -511,12 +566,14 @@ http.createServer(function (request, response) {
 	}
 	// get playlists and start a random one
 	getPlaylists(()=>{
-		if (playLists) {
+		if (playLists.length) {
 			if (!SS.curPlist) SS.curPlist = playLists[playLists.length * Math.random() | 0];
+			periodic();
+		} else {
+			runFBI('static/nolists.png');
 		}
-		waitX();
 	});
 	// manage display on/off times and check for playlist update
-	setInterval(periodic, 60000);
+	setInterval(periodic, 60000);	// once a minute
 });
 
