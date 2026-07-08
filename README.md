@@ -13,8 +13,7 @@ mv picframe-main picframe
 unlink main.zip
 
 # install other needed software
-sudo apt install nodejs
-sudo apt install fbi
+sudo apt install nodejs fbi
 
 # allow node to use port 80
 sudo setcap 'cap_net_bind_service=+ep' /usr/bin/node
@@ -22,6 +21,7 @@ sudo setcap 'cap_net_bind_service=+ep' /usr/bin/node
 # setup systemd services
 modify picframe.service file as necessary for user/home
 cd /etc/systemd/system
+# use correct directory path (if different)
 sudo ln -s /home/admin/picframe/cursor-off.service cursor-off.service
 sudo ln -s /home/admin/picframe/picframe.service picframe.service
 cd ~/picframe
