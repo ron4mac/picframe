@@ -1,0 +1,29 @@
+{
+  "name": "picframe",
+  "version": "1.0.0",
+  "description": "DIY digital photo frame.",
+  "keywords": [
+    "picture",
+    "photo",
+    "digital",
+    "frame"
+  ],
+  "main": "picframe.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ron4mac/picframe.git"
+  },
+  "author": "@ron4mac",
+  "license": "(ISC OR GPL-3.0)",
+  "bugs": {
+    "url": "https://github.com/ron4mac/picframe/issues"
+  },
+  "homepage": "https://github.com/ron4mac/picframe#readme",
+  "dependencies": {
+  }
+}
+

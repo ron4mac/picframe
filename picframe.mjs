@@ -38,22 +38,25 @@ process.on('SIGINT', signal => {
 	process.exit(0);
 });
 
+// turn the display on/off by (en)(dis)abling the hdmi output
 const displayOn = (oo) => {
 	const val = oo ? 0 : 1;
 	exec(`sudo sh -c 'echo ${val} > /sys/class/graphics/fb0/blank'`);
 };
 
+/*
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const popMsgImg = async (img) => {
 	const exp = exec(`fbi -a --noverbose ${img}`);
 	await delay(4000);
 	exp.kill();
 };
+*/
 
 // manage display on/off times and check for playlist update
 const periodic = () => {
-	let date_time = new Date();
-	let ctim = +(''+date_time.getHours()+date_time.getMinutes());
+	const date_time = new Date();
+	const ctim = +date_time.toTimeString().slice(0, 5).replace(':', '');
 	if (dspOn && (ctim > SS.offtime)) {
 		dspOn = false;
 		exec('killall -q fbi');
@@ -68,7 +71,7 @@ const periodic = () => {
 	// if the display is on and there is a playlist, check remote for a playlist update
 	if (dspOn && SS.curPlist && curPlprms) {
 		let str = '';
-		let req = https.get(curPlprms.plk+"&pco=1", (resp) => {
+		const req = https.get(curPlprms.plk+"&pco=1", (resp) => {
 			resp.on('data', (chunk) => {
 				str += chunk;
 			}).on('end', () => {
@@ -77,8 +80,6 @@ const periodic = () => {
 					console.log('Reloading playlist: ', SS.curPlist);
 					// need to kill feh first
 					exec('killall -q fbi', (error, stdout, stderr) => {
-					//	popMsgImg('static/updating.png').then(()=>getPlayList(curPlprms.plk, SS.curPlist, false));
-					//	popMsgImg('static/updating.png').then(()=>getPlayList(curPlprms.plk, SS.curPlist, false));
 						getPlayList(curPlprms.plk, SS.curPlist, false);
 					});
 				}
