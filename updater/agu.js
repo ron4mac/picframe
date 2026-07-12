@@ -1,10 +1,10 @@
 import path from 'path';
-//import fs from 'fs-extra';
-import {spawn, exec} from 'child_process';
+import fs from 'fs';
+import { spawn, exec } from 'child_process';
+import { promisify } from 'util';
 import https from 'https';
-//import appRootPath from 'app-root-path';
-import git from 'simple-git';
-//import Logger from 'chegs-simple-logger';
+import { pipeline } from 'node:stream/promises';
+import Logger from './logger.cjs';
 
 /**
  * @typedef {Object} Config - Configuration for Auto Git Update
@@ -32,7 +32,7 @@ const testing = false;
 // Create a new simple logger. This can be updated to use a new configuration by calling setLogConfig()
 // https://github.com/chegele/Logger
 let log = new Logger({});
-log.logGeneral = true;
+log.logGeneral = false;
 log.logWarning = true;
 log.logError   = true;
 log.logDetail  = false;
@@ -66,7 +66,7 @@ export default class AutoGitUpdate {
         // Validate that Auto Git Update is being used as a dependency or testing is enabled
         // This is to prevent the Auto Git Update module from being overwritten on accident during development
         if (!testing) {
-            let file = path.join(appRootPath.path, 'package.json');
+            let file = 'package.json';
             let appPackage = fs.readFileSync(file);
             appPackage = JSON.parse(appPackage);
             if (appPackage.name == 'auto-git-update') throw new Error('Auto Git Update is not being ran as a dependency & testing is not enabled.');
@@ -94,6 +94,7 @@ export default class AutoGitUpdate {
      * @returns {VersionResults} - An object with the results of the version comparison.
      */
     async compareVersions() {
+    	while (!ready) { await sleep(1000); log.general('Auto Git Update - Not ready to compare versions...')};
         try {
             log.general('Auto Git Update - Comparing versions...');
             let currentVersion = readAppVersion();
@@ -101,7 +102,7 @@ export default class AutoGitUpdate {
             log.general('Auto Git Update - Current version: ' + currentVersion);
             log.general('Auto Git Update - Remote Version: ' + remoteVersion);
             if (currentVersion == remoteVersion) return {upToDate: true, currentVersion};
-            return {upToDate: false, currentVersion, remoteVersion};
+            return {upToDate: false, currentVersion, remoteVersion, updtb: config.updtb};
         }catch(err) {
             log.error('Auto Git Update - Error comparing local and remote versions.');
             log.error(err);
@@ -121,7 +122,7 @@ export default class AutoGitUpdate {
             await downloadUpdate();
             await backupApp();
             await installUpdate();
-            await installDependencies();
+//            await installDependencies();
             log.general('Auto Git Update - Finished installing updated version.');
             if (config.executeOnComplete) await promiseBlindExecute(config.executeOnComplete);
             if (config.exitOnComplete) process.exit(1);
@@ -155,30 +156,38 @@ export default class AutoGitUpdate {
 async function backupApp() {
     let destination = path.join(config.tempLocation, backupSubdirectory);
     log.detail('Auto Git Update - Backing up app to ' + destination);
-    await fs.ensureDir(destination);
-    await fs.copy(appRootPath.path, destination, {dereference: true});
-    return true;
+    fs.mkdirSync(destination, {recursive: true});
+	try {
+	  fs.cpSync('./', destination, { recursive: true });
+	  console.log('Directory copied successfully!');
+	  return true;
+	} catch (err) {
+	  console.error('Error copying directory:', err.message);
+	}
 }
 
 /**
  * Downloads the update from the configured git repository.
- * The repo is cloned to the configured tempLocation.
+ * The update is unzipped to the configured tempLocation.
  */
 async function downloadUpdate() {
     // Inject token for private repositories
-    let repo = config.repository;
+    let repo = config.zurl;
     if (config.token) {
         repo = repo.replace('http://', '').replace('https://', '');
         repo = `https://${config.token}@${repo}`;
     }
 
-    // Empty destination directory & clone repo
+    // Empty destination directory & download repo
     let destination = path.join(config.tempLocation, cloneSubdirectory);
-    log.detail('Auto Git Update - Cloning ' + repo);
+    log.detail('Auto Git Update - Downloading ' + repo);
     log.detail('Auto Git Update - Destination: ' + destination);
-    await fs.ensureDir(destination);
-    await fs.emptyDir(destination);
-    await promiseClone(repo, destination, config.branch);
+    fs.rmSync(destination, { recursive: true, force: true });
+    fs.mkdirSync(destination, {recursive: true});
+    await downloadFile(repo, destination+'/update.zip');
+    await nativeSystemUnzip(destination+'/update.zip', destination);
+	const rdir = await findFilesInDir(destination, /^ron4mac-picframe-.*$/);
+	config.udir = rdir;
     return true;
 }
 
@@ -188,7 +197,7 @@ async function downloadUpdate() {
 function installDependencies() {
     return new Promise(function(resolve, reject) {
         //If testing is enabled, use alternative path to prevent overwrite of app.
-        let destination = testing ? path.join(appRootPath.path, '/testing/'): appRootPath.path;
+        let destination = testing ? '/tmp/testing' : './';	//testing ? path.join(appRootPath.path, '/testing/'): appRootPath.path;
         log.detail('Auto Git Update - Installing application dependencies in ' + destination);
         // Generate and execute command
         let command = `cd ${destination} && npm install`;
@@ -217,24 +226,24 @@ function installDependencies() {
  */
 async function installUpdate() {
     // Remove ignored files from the new version
+    console.log(config);
     if (config.ignoreFiles) {
         log.detail('Auto Git Update - Purging ignored files from the update');
         config.ignoreFiles.forEach(file => {
-            file = path.join(config.tempLocation, cloneSubdirectory, file);
+            file = path.join(/*config.tempLocation, cloneSubdirectory,*/ config.udir, file);
             log.detail('Auto Git Update - Removing ' + file);
             fs.unlinkSync(file);
         });
     }
 
     // Install updated files
-    let source = path.join(config.tempLocation, cloneSubdirectory);
+    let source = config.udir;	//path.join(config.tempLocation, cloneSubdirectory);
     //If testing is enabled, use alternative path to prevent overwrite of app.
-    let destination = testing ? path.join(appRootPath.path, '/testing/'): appRootPath.path;
+    let destination = testing ? '/tmp/testing' : './';	// testing ? path.join(appRootPath.path, '/testing/'): appRootPath.path;
     log.detail('Auto Git Update - Installing update...');
     log.detail('Auto Git Update - Source: ' + source);
     log.detail('Auto Git Update - Destination: ' + destination);
-    await fs.ensureDir(destination);
-    await fs.copy(source, destination);
+	fs.cpSync(source, destination, { recursive: true });
     return true;
 }
 
@@ -242,7 +251,7 @@ async function installUpdate() {
  * Reads the applications version from the package.json file.
  */
 function readAppVersion() {
-    let file = path.join(appRootPath.path, 'package.json');
+    let file = 'package.json';
     log.detail('Auto Git Update - Reading app version from ' + file);
     let appPackage = fs.readFileSync(file);
     return JSON.parse(appPackage).version;
@@ -288,9 +297,12 @@ async function readRemoteVersion() {
     // Attempt to identify the tag/version of the latest release
     try {
         let body = await promiseHttpsRequest(url, options);
-        let response = JSON.parse(body);
+        let response = JSON.parse(body);	console.log(response);
         let tag = response.tag_name;
+        let zurl = response.zipball_url;
         config.branch = tag;
+        config.zurl = zurl;
+        config.updtb = response.body;
         ready = true;
     }catch(err) {
         if (err = 404) throw new Error('This repository requires a token or does not exist. \n ' + url);
@@ -316,6 +328,75 @@ function promiseClone(repo, destination, branch) {
         });
     });
 }
+
+async function downloadFile(url, outputPath) {
+  try {
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`Unexpected response: ${response.statusText}`);
+    }
+
+    const fileStream = fs.createWriteStream(outputPath);
+    
+    // Efficiently pipe the web ReadableStream to the local file WritableStream
+    await pipeline(response.body, fileStream);
+    
+    console.log('Download complete!');
+  } catch (error) {
+    console.error('Download failed:', error.message);
+  }
+}
+
+async function nativeSystemUnzip(zipPath, outputDir) {
+  const execAsync = promisify(exec);
+  try {
+    const command = `unzip -o "${zipPath}" -d "${outputDir}"`;
+    await execAsync(command);
+    console.log('System unzipped successfully!');
+  } catch (error) {
+    console.error('System unzip failed:', error);
+  }
+}
+
+function findFilesInDir(dirPath, regex) {
+  return new Promise((resolve, reject) => {
+    // Standard asynchronous callback method
+    fs.readdir(dirPath, (err, files) => {
+      if (err) {
+        return reject(err);
+      }
+
+      // Filter and map inside the successful callback
+      const matches = files
+        .filter(file => regex.test(file))
+        .map(file => path.join(dirPath, file));
+
+      resolve(matches[0]);
+    });
+  });
+}
+
+function downloadWithHttps(url, destination) {
+  const file = fs.createWriteStream(destination);
+
+  https.get(url, (response) => {
+    if (response.statusCode !== 200) {
+      console.error(`Server returned status code: ${response.statusCode}`);
+      return;
+    }
+
+    response.pipe(file);
+
+    file.on('finish', () => {
+      file.close(() => console.log('Download complete!'));
+    });
+  }).on('error', (err) => {
+    fs.unlink(destination, () => {}); // Delete the broken file
+    console.error(`Error: ${err.message}`);
+  });
+}
+
 
 /**
  * A promise wrapper for the child-process spawn function. Does not listen for results.

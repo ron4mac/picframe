@@ -47,6 +47,9 @@
 	right: auto;
 	top: 10em;
 }
+#update {
+	font-size: larger;
+}
 .edform {
 	display: grid;
 	grid-template-columns: auto auto;
@@ -76,6 +79,17 @@
 	font-size: large;
 	margin-left: 1rem;
 }
+#updating {
+	display: none;
+	position: absolute;
+	left: 0;
+	top: 4em;
+	width: 100%;
+	text-align: center;
+	font-size: xxx-large;
+	color: cadetblue;
+	opacity: .5;
+}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"
 	integrity="sha512-SfTiTlX6kk+qitfevl/7LibUOeJWlt9rbyDn92a1DqWOw9vWG2MFoays0sgObmWazO5BQPiFucnnEAjpAB+/Sw=="
@@ -97,6 +111,7 @@
 	<button class="tablinks" onclick="openCity(event, 'playlists')" id="defaultOpen">Playlists</button>
 	<button class="tablinks" onclick="openCity(event, 'actions')">Actions</button>
 	<button class="tablinks" onclick="openCity(event, 'settings')">Settings</button>
+	<button class="tablinks" onclick="openCity(event, 'update')">Update</button>
 </div>
 <div id="playlists" class="tabcontent">
 	<div id="plists"></div>
@@ -118,6 +133,9 @@
 	<button onclick="dspSet(0)">Display Off</button>
 	<button onclick="dspSet(1)">Display On</button>
 </div>
+<div id="update" class="tabcontent" data-action="updateGet">
+	<div>Checking ...</div>
+</div>
 <div id="pledtdlg">
 	<div class="edform">
 		<label for="plNam">Playlist Name: </label><input type="text" id="plNam" name="plNam" value="">
@@ -130,6 +148,7 @@
 	<input type="radio" id="poBoot" name="poOpt" value="boot"> <label for="poBoot">Restart</label>
 	<div class="act"><button onclick="poAct(false)"> Cancel </button>&nbsp;&nbsp;&nbsp;<button onclick="poAct(true)"> Do It </button></div>
 </div>
+<div id="updating"><i class="fa fa-cog fa-spin fa-4x fa-fw"></i></div>
 <script>
 	var actvl = null;
 	var ovs = {};
@@ -270,6 +289,46 @@
 		})
 		.catch(err => alert('Failure: '+err));
 	};
+	const updateNow = () => {
+		if (!confirm('Are you sure that you want to install this update now?')) return;
+		document.getElementById('updating').style.display = 'block';
+		fetch(galURL+'/?updt=updt', {method:'GET'})
+		.then(resp => { console.log(resp); if (!resp.ok) throw new Error(`HTTP ${resp.status}`); if (true) return resp.json(); else return resp.text() })
+		.then(data => {
+			console.log(data);
+			if (data.success) {
+				setTimeout(()=>location.reload(), 3000);
+			} else {
+				document.getElementById('updating').style.display = 'none';
+				alert('There was an error in the update process.');
+			}
+		})
+		.catch(err => {
+			document.getElementById('updating').style.display = 'none';
+			alert('Failure: '+err);
+		});
+	};
+	const functionRegistry = {
+		updateGet: function() {
+			fetch(galURL+'/?updt=get', {method:'GET'})
+			.then(resp => { console.log(resp); if (!resp.ok) throw new Error(`HTTP ${resp.status}`); if (true) return resp.json(); else return resp.text() })
+			.then(data => {
+				console.log(data);
+				let content = '<div>There is no available update.</div>';
+				if (!data.UpToDate) {
+					content = '<div>There is an available update.</div>';
+					content += `<div>Current version: ${data.currentVersion} &raquo;&raquo; New version: ${data.remoteVersion}</div>`;
+					content += `<div>${data.updtb}</div>`;
+					content += '<button onclick="updateNow()">Update Now</button>';
+				}
+				document.getElementById('update').innerHTML = content;
+			})
+			.catch(err => alert('Failure: '+err));
+		},
+		anotherFunction: function() {
+			console.log("Executing another function!");
+		}
+	};
 	const openCity = (evt, cityName) => {
 		// Declare all variables
 		let i, tabcontent, tablinks;
@@ -286,8 +345,11 @@
 			tablinks[i].className = tablinks[i].className.replace(' active', '');
 		}
 
+		const tabd = document.getElementById(cityName);
+		console.log(tabd.dataset.action);
+		if (tabd.dataset.action) functionRegistry[tabd.dataset.action]();
 		// Show the current tab, and add an "active" class to the button that opened the tab
-		document.getElementById(cityName).style.display = 'block';
+		tabd.style.display = 'block';
 		evt.currentTarget.className += ' active';
 	};
 	getSets();

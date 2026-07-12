@@ -6,6 +6,8 @@ import {parse} from 'querystring';
 import {readFile,readFileSync,writeFile,writeFileSync,createWriteStream,readdir,existsSync,unlinkSync,mkdirSync,rmSync,renameSync} from 'fs';
 import path from 'path';
 import {exec} from 'child_process';
+import AutoGitUpdate from './updater/agu.js';
+
 
 // Config
 const documentRoot = '.';
@@ -22,10 +24,19 @@ const PLKEYS = 'plkeys';
 const PLKEYSFS = PLKEYS+'/';
 const SETSF = 'settings.json';
 
+const updtConfig = {
+	repository: 'https://github.com/ron4mac/picframe',
+	fromReleases: true,
+	tempLocation: '/tmp/',
+	ignoreFiles: ['cursor-off.service','picframe.service','update.js'],
+//	executeOnComplete: 'sudo systemctl restart picframe',
+	exitOnComplete: false
+};
+
+
 // dynamic variables
 var playLists = null;
 var curPlprms = null;
-//var dspDim = '1280x800';
 var dspOn = false;
 var SS = {ontime: 700, offtime: 2000, curPlist: null};
 
@@ -261,16 +272,11 @@ const performCommand = async (parms, resp) => {
 
 const fehRun = (plist, dly='5.0') => {
 	console.log(`Running playlist ${plist}`);
-//	runFBI(`--noonce -t ${dly} -l playlists/${plist}`);
 	runFBI(`--noonce -t ${dly} -l fbilist`);
 };
 
 const runFBI = (parms) => {
 	console.log(`Running playlist ${parms}`);
-	//exec(`DISPLAY=:0 feh -D ${dly} -F -Y -Z -f playlists/${plist}`, {uid:1000}, (error, stdout, stderr) => {
-	// changed to randomize each cycle thru list and get list from STDIN to prevent feh modifying playlist file
-//	exec('setterm --cursor off');
-//	exec(`fbi -a -u --noedit --noverbose --nointeractive ${parms}`, {uid:1000}, (error, stdout, stderr) => {
 	exec(`fbi -a -u --noedit --noverbose ${parms}`, {uid:1000}, (error, stdout, stderr) => {
 		if (error) {
 			if (error.code != 143) {
@@ -477,6 +483,24 @@ function getSettings (resp) {
 	jsonRespond(SS, resp);
 }
 
+// check for software update
+const updater = async (parms, resp) => {
+	const updtr = new AutoGitUpdate(updtConfig);
+	if (parms.updt == 'updt') {
+		updtr.forceUpdate()
+		.then((r) => {
+			jsonRespond({success: r}, resp);
+			if (r) exec('sudo systemctl restart picframe');
+		});
+		return;
+	}
+	updtr.compareVersions()
+	.then((r) => {
+		jsonRespond(r, resp);
+	});
+};
+
+
 /*
 should consider using this to get the display resolution
 exec("DISPLAY=:0 xrandr --current | grep '*' | awk '{print $1}'", (error, stdout, stderr) => {
@@ -487,8 +511,6 @@ exec("DISPLAY=:0 xrandr --current | grep '*' | awk '{print $1}'", (error, stdout
 
 // read the settings
 if (existsSync(SETSF)) SS = JSON.parse(readFileSync(SETSF));
-//exec('sudo sh -c "setterm --cursor off > /dev/tty1 && clear > /dev/tty1"');
-//exec('sudo sh -c "setterm --cursor off > /dev/tty1"');
 
 // Web server
 http.createServer(function (request, response) {
@@ -540,6 +562,10 @@ http.createServer(function (request, response) {
 	}
 	if (url.startsWith('/settings?')) {
 		setSettings(parse(url.substring(10)), response);
+		return;
+	}
+	if (url.startsWith('/?updt')) {
+		updater(parse(url.substring(2)), response);
 		return;
 	}
 
