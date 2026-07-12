@@ -232,7 +232,7 @@ async function installUpdate() {
         config.ignoreFiles.forEach(file => {
             file = path.join(/*config.tempLocation, cloneSubdirectory,*/ config.udir, file);
             log.detail('Auto Git Update - Removing ' + file);
-            fs.unlinkSync(file);
+            if (fs.existsSync(file)) fs.unlinkSync(file);
         });
     }
 
@@ -302,7 +302,7 @@ async function readRemoteVersion() {
         let zurl = response.zipball_url;
         config.branch = tag;
         config.zurl = zurl;
-        config.updtb = response.body;
+        config.updtb = response.name+'<br>'+response.body;
         ready = true;
     }catch(err) {
         if (err = 404) throw new Error('This repository requires a token or does not exist. \n ' + url);

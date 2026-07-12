@@ -28,7 +28,7 @@ const updtConfig = {
 	repository: 'https://github.com/ron4mac/picframe',
 	fromReleases: true,
 	tempLocation: '/tmp/',
-	ignoreFiles: ['cursor-off.service','picframe.service','update.js'],
+	ignoreFiles: ['cursor-off.service','picframe.service'],
 //	executeOnComplete: 'sudo systemctl restart picframe',
 	exitOnComplete: false
 };
