@@ -8,9 +8,9 @@ Start with Raspberry Pi OS lite (no desktop).
 ```
 # download the picframe software package from github
 wget "https://ron4mac@github.com/ron4mac/picframe/archive/V2fbi.zip"
-unzip main.zip
-mv picframe-main picframe
-unlink main.zip
+unzip V2fbi.zip
+mv picframe-2fbi picframe
+unlink V2fbi.zip
 
 # install other needed software
 sudo apt install nodejs fbi
