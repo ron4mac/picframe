@@ -312,7 +312,7 @@ const buildFbiList = (plist) => {
 	const imgd = `cache/${plist}/`;
 	mkdirSync(imgd, {recursive: true});
 	const regex = /&p=([^&]+)/;
-	lines.forEach(l => {
+	lines.filter(s => s.includes('&p=')).forEach(l => {
 		const match = l.match(regex);
 		pics.push(imgd+match[1]);
 		downloadImage(l, imgd+match[1]);
