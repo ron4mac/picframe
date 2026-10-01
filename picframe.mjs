@@ -6,6 +6,7 @@ import {parse} from 'querystring';
 import {readFile,readFileSync,writeFile,writeFileSync,createWriteStream,readdir,existsSync,unlinkSync,mkdirSync,rmSync,renameSync} from 'fs';
 import path from 'path';
 import {exec} from 'child_process';
+import {promisify} from 'util';
 import AutoGitUpdate from './updater/agu.js';
 
 
@@ -195,6 +196,18 @@ const sendKey = (key) => {
 	const stream = createWriteStream('/dev/tty1');
 	stream.write(key);
 	stream.end();
+}
+
+const sendKeyA = async (key) => {
+	const execAsync = promisify(exec);
+	try {
+		// Press key
+		await execAsync(`evemu-event /dev/input/event5 --type EV_KEY --code ${key} --value 1 --sync`);
+		// Release key
+		await execAsync(`evemu-event /dev/input/event5 --type EV_KEY --code ${key} --value 0 --sync`);
+	} catch (err) {
+		console.error('Failed to send key event:', err.message);
+	}
 };
 
 // perform command
@@ -248,8 +261,9 @@ const performCommand = async (parms, resp) => {
 			break;
 		case 'prev':
 		case 'next':
-			const key = parms.cmd == 'prev' ? 'k' : 'j';
-			sendKey(key);
+			const key = parms.cmd == 'prev' ? 106 : 105;
+		//	const key = parms.cmd == 'prev' ? 'k' : 'j';
+			sendKeyA(key);
 			jsonRespond({}, resp);
 			break;
 		case 'dsp':
@@ -277,7 +291,7 @@ const fehRun = (plist, dly='5.0') => {
 
 const runFBI = (parms) => {
 	console.log(`Running playlist ${parms}`);
-	exec(`fbi -a -u --noedit --noverbose ${parms}`, {uid:1000}, (error, stdout, stderr) => {
+	exec(`fbi --autoup -u --noedit --noverbose ${parms}`, {uid:1000}, (error, stdout, stderr) => {
 		if (error) {
 			if (error.code != 143) {
 				console.error(error);
@@ -310,12 +324,15 @@ const buildFbiList = (plist) => {
 	const lines = content.split(/\r?\n/);
 	let pics = [];
 	const imgd = `cache/${plist}/`;
+	rmSync(imgd, {recursive:true, force:true});
 	mkdirSync(imgd, {recursive: true});
-	const regex = /&p=([^&]+)/;
-	lines.filter(s => s.includes('&p=')).forEach(l => {
+	//const regex = /(&p=|&img=)([^&]+)/;
+	const regex = /(?:&p=|&img=)(.*)/;
+	lines.filter(s => s.includes('&p=')||s.includes('&img=')).forEach(l => {
 		const match = l.match(regex);
-		pics.push(imgd+match[1]);
-		downloadImage(l, imgd+match[1]);
+		const imgp = imgd+btoa(match[1]);
+		pics.push(imgp);
+		downloadImage(l+'&ddim='+dspDim, imgp);
 	});
 	writeFileSync('fbilist', pics.join('\n'), 'utf-8');
 };
