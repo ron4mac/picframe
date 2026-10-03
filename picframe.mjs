@@ -5,10 +5,9 @@ import https from 'https';
 import {parse} from 'querystring';
 import {readFile,readFileSync,writeFile,writeFileSync,createWriteStream,readdir,existsSync,unlinkSync,mkdirSync,rmSync,renameSync} from 'fs';
 import path from 'path';
-import {exec} from 'child_process';
-import {promisify} from 'util';
+import {fileURLToPath} from 'url';
+import {exec,execFile} from 'child_process';
 import AutoGitUpdate from './updater/agu.js';
-
 
 // Config
 const documentRoot = '.';
@@ -33,7 +32,6 @@ const updtConfig = {
 //	executeOnComplete: 'sudo systemctl restart picframe',
 	exitOnComplete: false
 };
-
 
 // dynamic variables
 var playLists = null;
@@ -193,21 +191,10 @@ const getPlaylists = (cb) => {
 };
 
 const sendKey = (key) => {
-	const stream = createWriteStream('/dev/tty1');
-	stream.write(key);
-	stream.end();
-}
-
-const sendKeyA = async (key) => {
-	const execAsync = promisify(exec);
-	try {
-		// Press key
-		await execAsync(`evemu-event /dev/input/event5 --type EV_KEY --code ${key} --value 1 --sync`);
-		// Release key
-		await execAsync(`evemu-event /dev/input/event5 --type EV_KEY --code ${key} --value 0 --sync`);
-	} catch (err) {
-		console.error('Failed to send key event:', err.message);
-	}
+	const __filename = fileURLToPath(import.meta.url);
+	const __dirname = path.dirname(__filename);
+	const spath = path.join(__dirname, 'ttykey');
+	execFile('sudo', [spath, '/dev/tty1', key]);
 };
 
 // perform command
@@ -261,9 +248,9 @@ const performCommand = async (parms, resp) => {
 			break;
 		case 'prev':
 		case 'next':
-			const key = parms.cmd == 'prev' ? 106 : 105;
-		//	const key = parms.cmd == 'prev' ? 'k' : 'j';
-			sendKeyA(key);
+		//	const key = parms.cmd == 'prev' ? 106 : 105;
+			const key = parms.cmd == 'prev' ? 'k' : 'j';
+			sendKey(key);
 			jsonRespond({}, resp);
 			break;
 		case 'dsp':
@@ -291,7 +278,7 @@ const fehRun = (plist, dly='5.0') => {
 
 const runFBI = (parms) => {
 	console.log(`Running playlist ${parms}`);
-	exec(`fbi --autoup -u --noedit --noverbose ${parms}`, {uid:1000}, (error, stdout, stderr) => {
+	exec(`fbi -T 1 --autoup -u --noedit --noverbose ${parms}`, {uid:1000}, (error, stdout, stderr) => {
 		if (error) {
 			if (error.code != 143) {
 				console.error(error);
@@ -516,7 +503,6 @@ const updater = async (parms, resp) => {
 		jsonRespond(r, resp);
 	});
 };
-
 
 /*
 should consider using this to get the display resolution

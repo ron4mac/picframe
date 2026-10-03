@@ -1,0 +1,6 @@
+#!/usr/bin/python3
+import fcntl, termios, sys
+tty = sys.argv[1]
+with open(tty, "w") as f:
+    for ch in sys.argv[2].encode().decode("unicode_escape"):
+        fcntl.ioctl(f, termios.TIOCSTI, ch.encode())

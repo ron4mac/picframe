@@ -35,6 +35,12 @@ ADMIN_PASSWORD="<password>"
 #LOCAL_PICFRAME="http://picframedev.local"
 # =======================================================
 
+# for 'Previous' and 'Next' to work in the web interface, special permissions need to be set (optional)
+sudo nano /etc/udev/rules.d/99-tty-permissions.rules
+# file Content ==========================================
+KERNEL=="tty1", MODE="0666", GROUP="tty"
+# =======================================================
+
 #enable and start services
 sudo systemctl enable cursor-off
 sudo systemctl enable picframe

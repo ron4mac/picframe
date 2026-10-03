@@ -19,6 +19,7 @@ StandardError=journal
 SyslogIdentifier=picframe
 User=admin
 Group=admin
+SupplementaryGroups=tty input video
 
 [Install]
 WantedBy=multi-user.target
