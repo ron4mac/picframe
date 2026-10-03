@@ -29,6 +29,8 @@ cd ~/picframe
 # create file 'service_vars'
 nano service_vars
 # file Content ==========================================
+#display resolution (default 1280x800)
+#FRAME_RESOLUTION="1920x1080"
 #password to administer the picframe
 ADMIN_PASSWORD="<password>"
 #if hostname is not 'picframe' provide proper URL

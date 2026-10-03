@@ -248,7 +248,6 @@ const performCommand = async (parms, resp) => {
 			break;
 		case 'prev':
 		case 'next':
-		//	const key = parms.cmd == 'prev' ? 106 : 105;
 			const key = parms.cmd == 'prev' ? 'k' : 'j';
 			sendKey(key);
 			jsonRespond({}, resp);
