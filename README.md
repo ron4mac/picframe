@@ -42,6 +42,9 @@ sudo nano /etc/udev/rules.d/99-tty-permissions.rules
 # file Content ==========================================
 KERNEL=="tty1", MODE="0666", GROUP="tty"
 # =======================================================
+# and, in addition, root has to be kept from grabbing the tty1 input
+sudo systemctl disable getty@tty1.service
+sudo systemctl mask getty@tty1.service
 
 #enable and start services
 sudo systemctl enable cursor-off
