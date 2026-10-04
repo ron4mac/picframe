@@ -21,5 +21,9 @@ User=admin
 Group=admin
 SupplementaryGroups=tty input video
 
+DeviceAllow=/dev/uinput rw
+DeviceAllow=/dev/tty1 rw
+DeviceAllow=/dev/fb0 rw
+
 [Install]
 WantedBy=multi-user.target
